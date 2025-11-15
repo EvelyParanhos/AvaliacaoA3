@@ -81,11 +81,11 @@ public class Agendamento {
 
     // Getters e Setters 
 
-    public Long getId() {
+    public Long getIdAgendamento() { 
         return idAgendamento;
     }
 
-    public void setId(Long idAgendamento) {
+    public void setIdAgendamento(Long idAgendamento) { 
         this.idAgendamento = idAgendamento;
     }
 
