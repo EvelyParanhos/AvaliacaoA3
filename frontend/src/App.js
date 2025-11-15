@@ -26,6 +26,7 @@ import AdminSolicitacoes from './pages/admin/AdminSolicitacoes';
 import AdminProfissionais from './pages/admin/AdminProfissionais';
 import AdminServicos from './pages/admin/AdminServicos';
 import AdminCalendario from './pages/admin/AdminCalendario';
+import AdminEspecialidades from './pages/admin/AdminEspecialidades';
 
 function App() {
   return (
@@ -128,6 +129,14 @@ function App() {
               element={
                 <ProtectedRoute allowedUserTypes={['administrador']}>
                   <AdminServicos />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/especialidades"
+              element={
+                <ProtectedRoute allowedUserTypes={['administrador']}>
+                  <AdminEspecialidades />
                 </ProtectedRoute>
               }
             />

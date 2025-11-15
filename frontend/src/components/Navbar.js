@@ -76,6 +76,9 @@ const Navbar = () => {
               <Link to="/admin/historico" className="navbar-link">
                 Histórico
               </Link>
+              <Link to="/admin/especialidades" className="navbar-link">
+                Especialidades
+              </Link>
             </>
           )}
 
