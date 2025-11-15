@@ -46,6 +46,8 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
     // Buscar agendamentos por profissional e status
     List<Agendamento> findByProfissionalIdUsuarioAndStatus(Long profissionalId, StatusAgendamento status);
 
+// --- NOVOS MÉTODOS PARA O ADMIN DELETAR ---
+
     // Encontra todos os agendamentos de um serviço
     List<Agendamento> findByServicoId(Long servicoId);
 

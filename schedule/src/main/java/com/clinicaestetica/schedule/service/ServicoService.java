@@ -54,7 +54,7 @@ public class ServicoService {
                 .orElseThrow(() -> new NoSuchElementException("Serviço com ID " + id + " não encontrado para exclusão"));
 
         // 1. CANCELAR Agendamentos futuros vinculados
-        // (Adicione o método findByServicoId ao AgendamentoRepository - veja próximo ficheiro)
+        // (findByServicoId precisa existir no AgendamentoRepository)
         List<Agendamento> agendamentos = agendamentoRepository.findByServicoId(id);
         for (Agendamento agendamento : agendamentos) {
             // Cancela apenas o que não está Concluído ou já Cancelado

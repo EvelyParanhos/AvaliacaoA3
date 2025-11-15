@@ -27,7 +27,7 @@ const AdminProfissionais = () => {
   };
 
   const deletar = async (id) => {
-    // Mensagem de confirmação atualizada
+    // Mensagem de confirmação atualizada com a nova regra
     if (window.confirm('Confirma exclusão? Este profissional será removido de especialidades e agendamentos futuros serão CANCELADOS.')) {
       try {
         await administradorAPI.deletarProfissional(id);
@@ -47,9 +47,22 @@ const AdminProfissionais = () => {
     toast.info(`Funcionalidade "Editar Profissional ${profissional.nome}" ainda não implementada.`);
   };
 
+
+  // --- CÓDIGO DE LOADING CORRIGIDO ---
   if (loading) {
-     // ... (código de loading) ...
+     return (
+        <>
+          <Navbar />
+          <div className="container">
+            <div className="loading-container">
+              <div className="spinner"></div>
+              <p>Carregando profissionais...</p>
+            </div>
+          </div>
+        </>
+    );
   }
+  // --- FIM DA CORREÇÃO ---
 
   return (
     <>

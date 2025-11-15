@@ -116,7 +116,7 @@ const AdminEspecialidades = () => {
     finally { setProcessando(false); }
   };
   
-  // --- Handlers de CADASTRO E ASSOCIAÇÃO (Lógica nova) ---
+  // --- Handlers de CADASTRO E ASSOCIAÇÃO (Sua Lógica) ---
   const handleCriarEAssociarServico = async (e) => {
     e.preventDefault();
     setProcessando(true);
@@ -131,7 +131,7 @@ const AdminEspecialidades = () => {
       
       toast.success('Serviço criado e associado com sucesso!');
       fecharModais();
-      carregarDados(); 
+      carregarDados(); // Recarrega tudo (especialidades, serviços, profissionais)
     } catch (error) { 
       toast.error('Erro ao criar e associar serviço'); 
       console.error(error);
@@ -152,16 +152,23 @@ const AdminEspecialidades = () => {
 
       toast.success('Profissional criado e associado com sucesso!');
       fecharModais();
-      carregarDados(); 
+      carregarDados(); // Recarrega tudo
     } catch (error) { 
       toast.error('Erro ao criar e associar profissional'); 
       console.error(error);
     } finally { setProcessando(false); }
   };
   
+  // Handler genérico para os formulários
   const handleChange = (e, setForm) => {
     let { name, value } = e.target;
-    // ... (lógica de máscaras) ...
+    
+    // Máscaras
+    if (name === 'cpf') value = value.replace(/\D/g, '').slice(0, 11);
+    else if (name === 'telefone') value = value.replace(/\D/g, '').slice(0, 11);
+    else if (name === 'cep') value = value.replace(/\D/g, '').slice(0, 8);
+    else if (name === 'estado') value = value.toUpperCase().slice(0, 2);
+
     setForm(prev => ({ ...prev, [name]: value }));
   };
   
@@ -182,8 +189,12 @@ const AdminEspecialidades = () => {
     resetarForms();
     setShowCriarEspecialidade(true);
   };
+
   if (loading) {
-    // ... (código de loading) ...
+    return (
+        <Navbar />
+        // ... (código de loading) ...
+    );
   }
 
   return (
@@ -191,7 +202,6 @@ const AdminEspecialidades = () => {
       <Navbar />
       <div className="container fade-in">
         
-        {/* --- CABEÇALHO (Botões de cadastro removidos daqui) --- */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', flexWrap: 'wrap' }}>
           <h1 style={{ color: 'var(--primary-color)', margin: 0 }}>
             Especialidades

@@ -7,7 +7,7 @@ const AdminServicos = () => {
   const [servicos, setServicos] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // A LÓGICA DE MODAL E FORM FOI REMOVIDA DAQUI
+  // A LÓGICA DE MODAL E FORM DE CRIAÇÃO FOI REMOVIDA DAQUI
 
   useEffect(() => {
     carregarServicos();
@@ -26,7 +26,8 @@ const AdminServicos = () => {
   };
 
   const deletar = async (id) => {
-    if (window.confirm('Confirma exclusão? Este serviço será removido de agendamentos e especialidades.')) {
+    // Mensagem de confirmação atualizada com a nova regra
+    if (window.confirm('Confirma exclusão? Este serviço será removido de especialidades e agendamentos futuros serão CANCELADOS.')) {
       try {
         await servicoAPI.deletar(id);
         toast.success('Serviço excluído');
@@ -48,9 +49,21 @@ const AdminServicos = () => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
   };
 
+  // --- CÓDIGO DE LOADING CORRIGIDO ---
   if (loading) {
-    // ... (código de loading) ...
+    return (
+        <>
+          <Navbar />
+          <div className="container">
+            <div className="loading-container">
+              <div className="spinner"></div>
+              <p>Carregando serviços...</p>
+            </div>
+          </div>
+        </>
+    );
   }
+  // --- FIM DA CORREÇÃO ---
 
   return (
     <>
@@ -62,11 +75,10 @@ const AdminServicos = () => {
           <h1 style={{ color: 'var(--primary-color)', margin: 0 }}>
             Gerenciar Serviços
           </h1>
-          {/* Botão de Novo foi REMOVIDO */}
         </div>
         
         <p style={{ color: 'var(--text-light)', marginBottom: '30px' }}>
-          Use esta tela para editar ou excluir serviços existentes. Para cadastrar, vá à tela de Especialidades.
+          Use esta tela para editar ou excluir serviços existentes. Para cadastrar, vá à tela de <strong>Especialidades</strong>.
         </p>
 
         {servicos.length > 0 ? (
@@ -107,8 +119,6 @@ const AdminServicos = () => {
           </div>
         )}
       </div>
-
-      {/* MODAL DE CADASTRO FOI REMOVIDO DAQUI */}
     </>
   );
 };
