@@ -13,7 +13,7 @@ const AdminServicos = () => {
     nome: '',
     descricao: '',
     preco: 0,
-    duracao_em_minutos: 30
+    duracao_em_minutos: 30 // O nome do campo no state está ok
   });
   const [processando, setProcessando] = useState(false);
 
@@ -21,18 +21,16 @@ const AdminServicos = () => {
     carregarServicos();
   }, []);
 
-  // --- NOVA FUNÇÃO DE TRATAMENTO DE ERRO ---
   const handleApiError = (error, defaultMessage) => {
     if (error.response && error.response.status === 400) {
-      const errors = error.response.data; // { campo: 'mensagem', ... }
+      const errors = error.response.data;
       
-      // Prioriza os erros mais comuns
       if (errors.nome) toast.error(`Nome: ${errors.nome}`);
       else if (errors.descricao) toast.error(`Descrição: ${errors.descricao}`);
       else if (errors.preco) toast.error(`Preço: ${errors.preco}`);
+      // A CHAVE DO ERRO AINDA É 'duracao_em_minutos' (nome do campo no Java)
       else if (errors.duracao_em_minutos) toast.error(`Duração: ${errors.duracao_em_minutos}`);
       else {
-        // Fallback para o primeiro erro
         const errorKeys = Object.keys(errors);
         if (errorKeys.length > 0) {
           toast.error(`${errorKeys[0]}: ${errors[errorKeys[0]]}`);
@@ -41,12 +39,10 @@ const AdminServicos = () => {
         }
       }
     } else {
-      // Erro 500 ou outro erro de rede
       toast.error(error.response?.data?.message || defaultMessage);
     }
     console.error(error);
   };
-  // --- FIM DA FUNÇÃO ---
 
   const carregarServicos = async () => {
     try {
@@ -67,7 +63,6 @@ const AdminServicos = () => {
         toast.success('Serviço excluído');
         carregarServicos();
       } catch (error) {
-        // Erro 500 (ConstraintViolation) ou 404
         handleApiError(error, 'Erro ao excluir serviço.');
       }
     }
@@ -79,7 +74,7 @@ const AdminServicos = () => {
       nome: servico.nome,
       descricao: servico.descricao,
       preco: servico.preco,
-      duracao_em_minutos: servico.duracaoEmMinutos 
+      duracao_em_minutos: servico.duracaoEmMinutos // O state é preenchido com camelCase
     });
     setShowModal(true);
   };
@@ -102,14 +97,17 @@ const AdminServicos = () => {
     e.preventDefault();
     setProcessando(true);
     try {
+      // --- CORREÇÃO AQUI ---
+      // O backend espera 'duracaoEmMinutos' (camelCase)
       const dadosAtualizados = {
         nome: formData.nome,
         descricao: formData.descricao,
         preco: parseFloat(formData.preco),
-        duracao_em_minutos: parseInt(formData.duracao_em_minutos, 10) 
+        duracaoEmMinutos: parseInt(formData.duracao_em_minutos, 10) // <-- CORRIGIDO AQUI
       };
 
-      // Adiciona verificação de campos obrigatórios no frontend
+      // --- E CORREÇÃO AQUI ---
+      // A validação do frontend precisa checar o campo 'duracaoEmMinutos'
       if (!dadosAtualizados.nome || dadosAtualizados.nome.trim().length === 0) {
         toast.error("O campo Nome é obrigatório.");
         setProcessando(false);
@@ -125,18 +123,18 @@ const AdminServicos = () => {
          setProcessando(false);
          return;
       }
-       if (isNaN(dadosAtualizados.duracao_em_minutos) || dadosAtualizados.duracao_em_minutos < 1) {
+       if (isNaN(dadosAtualizados.duracaoEmMinutos) || dadosAtualizados.duracaoEmMinutos < 1) { // <-- CORRIGIDO AQUI
          toast.error("A Duração deve ser de no mínimo 1 minuto.");
          setProcessando(false);
          return;
       }
+      // --- FIM DA CORREÇÃO ---
 
       await servicoAPI.atualizar(servicoEditando.id, dadosAtualizados);
       toast.success('Serviço atualizado!');
       fecharModal();
       carregarServicos();
     } catch (error) {
-      // --- CORRIGIDO: Usa a nova função de erro ---
       handleApiError(error, 'Erro ao atualizar serviço');
     } finally {
       setProcessando(false);
@@ -228,18 +226,17 @@ const AdminServicos = () => {
                 <input type="text" name="nome" className="form-control" value={formData.nome} onChange={handleChange} required />
               </div>
               <div className="form-group">
-                {/* --- CORRIGIDO: Adicionado required --- */}
                 <label className="form-label">Descrição *</label>
                 <textarea name="descricao" className="form-control" rows="3" value={formData.descricao} onChange={handleChange} required></textarea>
               </div>
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Preço (R$) *</label>
-                  {/* --- CORRIGIDO: Adicionado min="0.01" --- */}
                   <input type="number" name="preco" className="form-control" value={formData.preco} onChange={handleChange} required min="0.01" step="0.01" />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Duração (min) *</label>
+                  {/* O 'name' do input continua o mesmo, pois ele controla o state 'formData' */}
                   <input type="number" name="duracao_em_minutos" className="form-control" value={formData.duracao_em_minutos} onChange={handleChange} required min="1" />
                 </div>
               </div>

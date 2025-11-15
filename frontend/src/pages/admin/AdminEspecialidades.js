@@ -79,20 +79,18 @@ const AdminEspecialidades = () => {
     resetarForms();
   }
 
-  // --- NOVA FUNÇÃO DE TRATAMENTO DE ERRO (ATUALIZADA) ---
   const handleApiError = (error, defaultMessage) => {
     if (error.response && error.response.status === 400) {
-      const errors = error.response.data; // { campo: 'mensagem', ... }
+      const errors = error.response.data; 
       
-      // Prioriza os erros mais comuns
       if (errors.nome) toast.error(`Nome: ${errors.nome}`);
       else if (errors.descricao) toast.error(`Descrição: ${errors.descricao}`);
       else if (errors.preco) toast.error(`Preço: ${errors.preco}`);
-      else if (errors.duracao_em_minutos) toast.error(`Duração: ${errors.duracao_em_minutos}`);
+      // A chave do erro do backend é 'duracao_em_minutos' (nome do campo Java)
+      else if (errors.duracao_em_minutos) toast.error(`Duração: ${errors.duracao_em_minutos}`); 
       else if (errors.email) toast.error(`Email: ${errors.email}`);
       else if (errors.cpf) toast.error(`CPF: ${errors.cpf}`);
       else {
-        // Fallback para o primeiro erro
         const errorKeys = Object.keys(errors);
         if (errorKeys.length > 0) {
           toast.error(`${errorKeys[0]}: ${errors[errorKeys[0]]}`);
@@ -101,12 +99,10 @@ const AdminEspecialidades = () => {
         }
       }
     } else {
-      // Erro 500 ou outro erro de rede
       toast.error(error.response?.data?.message || defaultMessage);
     }
     console.error(error);
   };
-  // --- FIM DA FUNÇÃO ---
 
   const handleCriarEspecialidade = async (e) => {
     e.preventDefault();
@@ -156,12 +152,15 @@ const AdminEspecialidades = () => {
     e.preventDefault();
     setProcessando(true);
     
+    // --- CORREÇÃO AQUI ---
+    // O backend espera 'duracaoEmMinutos' (camelCase)
     const servicoDTO = {
       nome: formServico.nome,
       descricao: formServico.descricao,
       preco: parseFloat(formServico.preco),
-      duracao_em_minutos: parseInt(formServico.duracao_em_minutos, 10)
+      duracaoEmMinutos: parseInt(formServico.duracao_em_minutos, 10) // <-- CORRIGIDO AQUI
     };
+    // --- FIM DA CORREÇÃO ---
 
     try {
       const servicoResponse = await servicoAPI.criar(servicoDTO);
@@ -174,7 +173,6 @@ const AdminEspecialidades = () => {
       fecharModais();
       carregarDados();
     } catch (error) { 
-      // --- CORRIGIDO: Usa a nova função de erro ---
       handleApiError(error, 'Erro ao criar e associar serviço');
     } finally { setProcessando(false); }
   };
@@ -194,7 +192,6 @@ const AdminEspecialidades = () => {
       fecharModais();
       carregarDados();
     } catch (error) { 
-       // --- CORRIGIDO: Usa a nova função de erro ---
        handleApiError(error, 'Erro ao criar e associar profissional');
     } finally { setProcessando(false); }
   };
@@ -369,6 +366,7 @@ const AdminEspecialidades = () => {
                     </div>
                     <div className="form-group">
                         <label className="form-label">Duração (min) *</label>
+                        {/* O 'name' do input continua o mesmo, pois ele controla o state 'formData' */}
                         <input type="number" name="duracao_em_minutos" className="form-control" value={formServico.duracao_em_minutos} onChange={(e) => handleChange(e, setFormServico)} required min="1" />
                     </div>
                 </div>
@@ -412,6 +410,7 @@ const AdminEspecialidades = () => {
             
             {isCreatingNew && (
               <form onSubmit={handleCriarEAssociarProfissional} style={{marginTop: '10px'}}>
+                {/* ... (O formulário de profissional está correto e não precisa de mudanças) ... */}
                 <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">Nome Completo *</label>
