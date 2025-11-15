@@ -70,14 +70,15 @@ const Navbar = () => {
               <Link to="/admin/servicos" className="navbar-link">
                 Serviços
               </Link>
+              {/* LINK ADICIONADO */}
+              <Link to="/admin/especialidades" className="navbar-link">
+                Especialidades
+              </Link>
               <Link to="/admin/solicitacoes" className="navbar-link">
                 Solicitações
               </Link>
               <Link to="/admin/historico" className="navbar-link">
                 Histórico
-              </Link>
-              <Link to="/admin/especialidades" className="navbar-link">
-                Especialidades
               </Link>
             </>
           )}

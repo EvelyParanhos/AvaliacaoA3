@@ -12,7 +12,6 @@ import com.clinicaestetica.schedule.model.Agendamento;
 import com.clinicaestetica.schedule.repository.ProfissionalRepository;
 import com.clinicaestetica.schedule.model.Profissional;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.NoSuchElementException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -33,6 +32,7 @@ public class SolicitacaoService {
     private ProfissionalRepository profissionalRepository;
 
 
+    // CORRIGIDO: Adicionada lógica de verificação
     public Solicitacao criarSolicitacaoAgendamento(CriarSolicitacaoDTO dto) {
         
         // Buscar agendamento
@@ -47,6 +47,22 @@ public class SolicitacaoService {
         if (!agendamento.getProfissional().getIdUsuario().equals(profissional.getIdUsuario())) {
             throw new IllegalArgumentException("Profissional só pode criar solicitação para seus próprios agendamentos");
         }
+
+        // --- NOVAS REGRAS DE NEGÓCIO ---
+        // 1. Não pode criar solicitação para agendamento cancelado
+        if (agendamento.getStatus() == StatusAgendamento.CANCELADO) {
+            throw new IllegalArgumentException("Este agendamento já está cancelado.");
+        }
+
+        // 2. Não pode criar solicitação se já houver uma PENDENTE
+        boolean temPendente = agendamento.getSolicitacoes().stream()
+            .anyMatch(s -> s.getStatus() == StatusSolicitacao.PENDENTE);
+        
+        if (temPendente) {
+            throw new IllegalArgumentException("Este agendamento já possui uma solicitação pendente.");
+        }
+        // --- FIM DAS NOVAS REGRAS ---
+
 
         // Criar solicitação
         Solicitacao solicitacao = new Solicitacao();
@@ -64,6 +80,7 @@ public class SolicitacaoService {
         return solicitacaoRepository.findAll();
     }
 
+    // CORRIGIDO: Adicionada lógica de verificação
     public Solicitacao criarSolicitacaoReagendamento(CriarSolicitacaoReagendamentoDTO dto) {
         // 1. Buscar agendamento e profissional
         Agendamento agendamento = agendamentoRepository.findById(dto.getAgendamentoId())
@@ -72,14 +89,20 @@ public class SolicitacaoService {
         Profissional profissional = profissionalRepository.findById(dto.getProfissionalId())
             .orElseThrow(() -> new NoSuchElementException("Profissional com ID " + dto.getProfissionalId() + " não encontrado"));
 
-        // 2. Regra de Negócio: Regra das 24 horas (Cliente só pode solicitar reagendamento até um dia antes)
-        LocalDateTime agora = LocalDateTime.now();
-        // Verifica se faltam menos de 24h. Se for o caso, horasRestantes será < 24.
-        long horasRestantes = ChronoUnit.HOURS.between(agora, agendamento.getDataHora());
-        
-        if (horasRestantes < 24) { // Se faltarem menos de 24h
-             throw new IllegalArgumentException("Não é possível solicitar reagendamento com menos de 24h de antecedência.");
+        // --- NOVAS REGRAS DE NEGÓCIO (do outro método, aplicadas aqui também) ---
+        // 1. Não pode criar solicitação para agendamento cancelado
+        if (agendamento.getStatus() == StatusAgendamento.CANCELADO) {
+            throw new IllegalArgumentException("Este agendamento já está cancelado.");
         }
+
+        // 2. Não pode criar solicitação se já houver uma PENDENTE
+        boolean temPendente = agendamento.getSolicitacoes().stream()
+            .anyMatch(s -> s.getStatus() == StatusSolicitacao.PENDENTE);
+        
+        if (temPendente) {
+            throw new IllegalArgumentException("Este agendamento já possui uma solicitação pendente.");
+        }
+        // --- FIM DAS NOVAS REGRAS ---
         
         // 3. Validação: Checar conflito de horário na nova data/hora
         boolean conflito = agendamentoRepository.existsByProfissionalIdUsuarioAndDataHoraAndStatusNot(

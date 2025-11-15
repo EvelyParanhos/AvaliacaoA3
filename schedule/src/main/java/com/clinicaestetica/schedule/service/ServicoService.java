@@ -2,14 +2,15 @@ package com.clinicaestetica.schedule.service;
 import com.clinicaestetica.schedule.repository.ServicoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import com.clinicaestetica.schedule.model.Especialidade; // Importe isto
 import com.clinicaestetica.schedule.model.Profissional;
 import com.clinicaestetica.schedule.model.Servico;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors; 
+import org.springframework.transaction.annotation.Transactional; // Importe isto
 
 @Service
-
 public class ServicoService {
     
     @Autowired
@@ -38,10 +39,23 @@ public class ServicoService {
                 .orElseThrow(() -> new NoSuchElementException("Serviço com ID " + id + " não encontrado"));
     }
 
+    // CORRIGIDO: Agora transacional e remove associações
+    @Transactional
     public void deletarServico(Long id) {
-        if (!servicoRepository.existsById(id)) {
-            throw new NoSuchElementException("Serviço com ID " + id + " não encontrado para exclusão");
+        Servico servico = servicoRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Serviço com ID " + id + " não encontrado para exclusão"));
+
+        // Como Especialidade é o "dono" da relação,
+        // precisamos iterar pelas especialidades e remover este serviço de cada uma
+        for (Especialidade especialidade : servico.getEspecialidades()) {
+            especialidade.getServicos().remove(servico);
         }
-        servicoRepository.deleteById(id);
+        // Não é preciso salvar a especialidade, o JPA gerencia
+        
+        // Limpa a coleção no lado do serviço (boa prática)
+        servico.getEspecialidades().clear();
+        
+        // Agora podemos deletar o serviço
+        servicoRepository.delete(servico);
     }
 }

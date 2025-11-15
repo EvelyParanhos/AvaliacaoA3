@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { clienteAPI, agendamentoAPI, avaliacaoAPI, solicitacaoAPI } from '../../services/api';
+// CORRIGIDO: Removido solicitacaoAPI, Adicionado agendamentoAPI
+import { clienteAPI, agendamentoAPI, avaliacaoAPI } from '../../services/api'; 
 import Navbar from '../../components/Navbar';
 import { toast } from 'react-toastify';
+import { useLocation } from 'react-router-dom'; // Para o histórico
 
 const ClienteAgendamentos = () => {
   const { user } = useAuth();
+  const location = useLocation(); // Para o histórico
+  
+  // CORRIGIDO: Filtro padrão ou vindo do clique no "Histórico"
+  const [filtro, setFiltro] = useState(location.state?.filtro || 'futuros');
+  
   const [agendamentos, setAgendamentos] = useState([]);
-  const [filtro, setFiltro] = useState('futuros');
   const [loading, setLoading] = useState(true);
   const [showModalCancelar, setShowModalCancelar] = useState(false);
   const [showModalReagendar, setShowModalReagendar] = useState(false);
@@ -16,7 +22,7 @@ const ClienteAgendamentos = () => {
   const [processando, setProcessando] = useState(false);
 
   const [novaDataHora, setNovaDataHora] = useState('');
-  const [descricaoReagendamento, setDescricaoReagendamento] = useState('');
+  // Removido - não precisamos mais de descrição para reagendamento direto
   
   const [avaliacao, setAvaliacao] = useState({
     nota: 5,
@@ -24,63 +30,20 @@ const ClienteAgendamentos = () => {
   });
 
   useEffect(() => {
-    if (user?.idUsuario) {
-      carregarAgendamentos();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtro, user]);
+    carregarAgendamentos();
+  }, [filtro, user.idUsuario]); // Adicionado user.idUsuario como dependência
 
   const carregarAgendamentos = async () => {
-    if (!user?.idUsuario) {
-      toast.error('Usuário não identificado');
-      return;
-    }
-
+    if (!user?.idUsuario) return; // Garante que o usuário exista
     try {
       setLoading(true);
+      const response = await clienteAPI.buscarAgendamentos(user.idUsuario, filtro);
       
-      // Busca TODOS os agendamentos do cliente
-      const response = await clienteAPI.buscarAgendamentos(user.idUsuario, '');
-      
-      if (!response.data) {
-        setAgendamentos([]);
-        return;
-      }
-
-      const agora = new Date();
-      let agendamentosFiltrados = [];
-
-      // Aplica o filtro localmente
-      if (filtro === 'futuros') {
-        agendamentosFiltrados = response.data.filter(ag => {
-          const dataAgendamento = new Date(ag.dataHora);
-          const statusValido = ag.status === 'AGENDADO' || ag.status === 'ALTERADO';
-          return statusValido && dataAgendamento > agora;
-        });
-      } else if (filtro === 'passados') {
-        agendamentosFiltrados = response.data.filter(ag => {
-          const dataAgendamento = new Date(ag.dataHora);
-          return ag.status === 'CONCLUÍDO' || 
-                 ag.status === 'CANCELADO' || 
-                 dataAgendamento <= agora;
-        });
-      } else {
-        // Todos
-        agendamentosFiltrados = response.data;
-      }
-
-      // Ordena por data (mais recentes primeiro para passados, próximos primeiro para futuros)
-      agendamentosFiltrados.sort((a, b) => {
-        const dataA = new Date(a.dataHora);
-        const dataB = new Date(b.dataHora);
-        return filtro === 'passados' ? dataB - dataA : dataA - dataB;
-      });
-
-      setAgendamentos(agendamentosFiltrados);
+      // A lógica de filtro no backend (com HQL) já está correta, não precisamos filtrar no frontend
+      setAgendamentos(response.data);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
       toast.error('Erro ao carregar agendamentos');
-      setAgendamentos([]);
     } finally {
       setLoading(false);
     }
@@ -88,18 +51,14 @@ const ClienteAgendamentos = () => {
 
   const formatarData = (dataHora) => {
     if (!dataHora) return 'Data inválida';
-    try {
-      const data = new Date(dataHora);
-      return data.toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      return 'Data inválida';
-    }
+    const data = new Date(dataHora);
+    return data.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   const formatarMoeda = (valor) => {
@@ -120,52 +79,23 @@ const ClienteAgendamentos = () => {
     return badges[status] || 'badge-info';
   };
 
-  const getStatusTexto = (status) => {
-    const textos = {
-      'AGENDADO': 'Agendado',
-      'CONCLUÍDO': 'Concluído',
-      'CANCELADO': 'Cancelado',
-      'ALTERADO': 'Alterado'
-    };
-    return textos[status] || status;
-  };
-
-  const podeCancelar = (agendamento) => {
+  // Lógica de 24h
+  const podeInteragir = (agendamento) => {
     if (!agendamento || !agendamento.dataHora) return false;
+    const dataAgendamento = new Date(agendamento.dataHora);
+    const agora = new Date();
+    const diferencaHoras = (dataAgendamento - agora) / (1000 * 60 * 60);
     
-    try {
-      const dataAgendamento = new Date(agendamento.dataHora);
-      const agora = new Date();
-      const diferencaHoras = (dataAgendamento - agora) / (1000 * 60 * 60);
-      
-      return agendamento.status === 'AGENDADO' && diferencaHoras >= 24;
-    } catch (error) {
-      return false;
-    }
-  };
-
-  const podeReagendar = (agendamento) => {
-    if (!agendamento || !agendamento.dataHora) return false;
-    
-    try {
-      const dataAgendamento = new Date(agendamento.dataHora);
-      const agora = new Date();
-      const diferencaHoras = (dataAgendamento - agora) / (1000 * 60 * 60);
-      
-      return agendamento.status === 'AGENDADO' && diferencaHoras >= 24;
-    } catch (error) {
-      return false;
-    }
-  };
+    // Pode interagir se for AGENDADO ou ALTERADO E tiver mais de 24h
+    return (agendamento.status === 'AGENDADO' || agendamento.status === 'ALTERADO') && diferencaHoras >= 24;
+  }
 
   const podeAvaliar = (agendamento) => {
-    return agendamento && 
-           agendamento.status === 'CONCLUÍDO' && 
-           !agendamento.avaliacao;
+    return agendamento && agendamento.status === 'CONCLUÍDO' && !agendamento.avaliacao;
   };
 
   const abrirModalCancelar = (agendamento) => {
-    if (!podeCancelar(agendamento)) {
+    if (!podeInteragir(agendamento)) {
       toast.error('Não é possível cancelar agendamentos com menos de 24h de antecedência');
       return;
     }
@@ -181,65 +111,34 @@ const ClienteAgendamentos = () => {
 
     setProcessando(true);
     try {
+      // Usamos a API de agendamento, não de solicitação
       const response = await agendamentoAPI.cancelar(agendamentoSelecionado.idAgendamento);
-      
       if (response.status === 204 || response.status === 200) {
         toast.success('Agendamento cancelado com sucesso!');
         setShowModalCancelar(false);
-        setAgendamentoSelecionado(null);
-        carregarAgendamentos();
+        carregarAgendamentos(); // Recarrega a lista
       }
     } catch (error) {
-      console.error('Erro ao cancelar:', error);
-      const mensagem = error.response?.data?.message || 
-                      error.response?.data || 
-                      'Erro ao cancelar agendamento';
+      // O backend já tem a regra de 24h, então podemos mostrar o erro dele
+      const mensagem = error.response?.data || 'Erro ao cancelar agendamento';
       toast.error(mensagem);
+      console.error('Erro ao cancelar:', error);
     } finally {
       setProcessando(false);
     }
   };
 
   const abrirModalReagendar = (agendamento) => {
-    if (!podeReagendar(agendamento)) {
+    if (!podeInteragir(agendamento)) {
       toast.error('Não é possível reagendar agendamentos com menos de 24h de antecedência');
       return;
     }
     setAgendamentoSelecionado(agendamento);
     setNovaDataHora('');
-    setDescricaoReagendamento('');
     setShowModalReagendar(true);
   };
 
-  const validarReagendamento = (dataHoraString) => {
-    if (!dataHoraString) {
-      toast.error('Selecione uma nova data e hora');
-      return false;
-    }
-
-    const dataHoraSelecionada = new Date(dataHoraString);
-    const agora = new Date();
-
-    if (dataHoraSelecionada <= agora) {
-      toast.error('Não é possível reagendar para data passada');
-      return false;
-    }
-
-    const hora = dataHoraSelecionada.getHours();
-    if (hora < 8 || hora >= 18) {
-      toast.error('Horário fora do expediente (8h-18h)');
-      return false;
-    }
-
-    const diaSemana = dataHoraSelecionada.getDay();
-    if (diaSemana === 0) {
-      toast.error('A clínica não funciona aos domingos');
-      return false;
-    }
-
-    return true;
-  };
-
+  // --- LÓGICA DE REAGENDAMENTO DIRETO ---
   const handleReagendar = async (e) => {
     e.preventDefault();
     
@@ -253,45 +152,46 @@ const ClienteAgendamentos = () => {
       return;
     }
     
-    if (!validarReagendamento(novaDataHora)) {
+    // Validar horário de funcionamento
+    const dataHoraSelecionada = new Date(novaDataHora);
+    const hora = dataHoraSelecionada.getHours();
+    
+    if (hora < 8 || hora >= 18) {
+      toast.error('Horário fora do expediente. Funcionamos das 8h às 18h.');
+      return;
+    }
+
+    if (dataHoraSelecionada < new Date()) {
+      toast.error('Não é possível reagendar para data passada');
       return;
     }
 
     setProcessando(true);
     try {
-      const solicitacao = {
-        agendamentoId: agendamentoSelecionado.idAgendamento,
-        profissionalId: agendamentoSelecionado.profissional.idUsuario,
-        descricao: descricaoReagendamento || 'Solicitação de reagendamento',
-        novaDataHora: novaDataHora
-      };
-
-      console.log('Enviando solicitação de reagendamento:', solicitacao);
-
-      const response = await solicitacaoAPI.criarReagendamento(solicitacao);
+      // Chamamos a API de reagendamento direto
+      // O backend espera a data no formato JSON "YYYY-MM-DDTHH:MM:SS"
+      const response = await agendamentoAPI.reagendar(agendamentoSelecionado.idAgendamento, novaDataHora);
       
-      if (response.status === 201) {
-        toast.success('Solicitação de reagendamento enviada! Aguarde aprovação do administrador.');
+      if (response.status === 200) {
+        toast.success('Agendamento reagendado com sucesso!');
         setShowModalReagendar(false);
-        setAgendamentoSelecionado(null);
-        setNovaDataHora('');
-        setDescricaoReagendamento('');
-        carregarAgendamentos();
+        carregarAgendamentos(); // Recarrega a lista
       }
     } catch (error) {
-      console.error('Erro ao reagendar:', error);
-      const mensagem = error.response?.data?.message || 
-                      error.response?.data || 
-                      'Erro ao solicitar reagendamento';
+      // O backend já tem as regras de 24h e conflito de horário
+      const mensagem = error.response?.data || 'Erro ao reagendar. O horário pode estar indisponível.';
       toast.error(mensagem);
+      console.error('Erro ao reagendar:', error);
     } finally {
       setProcessando(false);
     }
   };
+  // --- FIM DA LÓGICA DE REAGENDAMENTO ---
+
 
   const abrirModalAvaliar = (agendamento) => {
     if (!podeAvaliar(agendamento)) {
-      toast.error('Apenas agendamentos concluídos podem ser avaliados');
+      toast.error('Apenas agendamentos concluídos e não avaliados podem ser avaliados');
       return;
     }
     setAgendamentoSelecionado(agendamento);
@@ -312,43 +212,24 @@ const ClienteAgendamentos = () => {
       return;
     }
 
-    if (avaliacao.comentario.trim().length < 10) {
-      toast.error('O comentário deve ter pelo menos 10 caracteres');
-      return;
-    }
-
     setProcessando(true);
     try {
       const response = await avaliacaoAPI.criar(agendamentoSelecionado.idAgendamento, avaliacao);
       
       if (response.status === 201) {
-        toast.success('Avaliação enviada com sucesso! Obrigado pelo seu feedback.');
+        toast.success('Avaliação enviada com sucesso!');
         setShowModalAvaliar(false);
-        setAgendamentoSelecionado(null);
-        setAvaliacao({ nota: 5, comentario: '' });
         carregarAgendamentos();
       }
     } catch (error) {
-      console.error('Erro ao avaliar:', error);
       const mensagem = error.response?.data?.message || 
                       error.response?.data || 
                       'Erro ao enviar avaliação';
       toast.error(mensagem);
+      console.error('Erro ao avaliar:', error);
     } finally {
       setProcessando(false);
     }
-  };
-
-  const getMinDateTime = () => {
-    const amanha = new Date();
-    amanha.setDate(amanha.getDate() + 1);
-    amanha.setHours(8, 0, 0, 0);
-    
-    const ano = amanha.getFullYear();
-    const mes = String(amanha.getMonth() + 1).padStart(2, '0');
-    const dia = String(amanha.getDate()).padStart(2, '0');
-    
-    return `${ano}-${mes}-${dia}T08:00`;
   };
 
   if (loading) {
@@ -385,23 +266,19 @@ const ClienteAgendamentos = () => {
                   className={`btn ${filtro === 'futuros' ? 'btn-primary' : 'btn-outline'}`}
                   onClick={() => setFiltro('futuros')}
                 >
-                  📅 Próximos ({agendamentos.filter(a => {
-                    const dataAg = new Date(a.dataHora);
-                    const agora = new Date();
-                    return (a.status === 'AGENDADO' || a.status === 'ALTERADO') && dataAg > agora;
-                  }).length})
+                  Próximos
                 </button>
                 <button
                   className={`btn ${filtro === 'passados' ? 'btn-primary' : 'btn-outline'}`}
                   onClick={() => setFiltro('passados')}
                 >
-                  📋 Passados
+                  Passados
                 </button>
                 <button
                   className={`btn ${filtro === '' ? 'btn-primary' : 'btn-outline'}`}
                   onClick={() => setFiltro('')}
                 >
-                  📊 Todos
+                  Todos
                 </button>
               </div>
             </div>
@@ -413,79 +290,57 @@ const ClienteAgendamentos = () => {
               {agendamentos.map((agendamento) => (
                 <div key={agendamento.idAgendamento} className="card">
                   <div className="card-header">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                      <span style={{ fontWeight: 'bold' }}>
-                        {agendamento.servico?.nome || 'Serviço não informado'}
-                      </span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{agendamento.servico?.nome || 'Serviço não informado'}</span>
                       <span className={`badge ${getStatusBadge(agendamento.status)}`}>
-                        {getStatusTexto(agendamento.status)}
+                        {agendamento.status}
                       </span>
                     </div>
                   </div>
                   <div className="card-body">
-                    <div style={{ marginBottom: '15px' }}>
-                      <p style={{ margin: '5px 0' }}>
-                        <strong>📅 Data e Hora:</strong> {formatarData(agendamento.dataHora)}
+                    <p><strong>📅 Data:</strong> {formatarData(agendamento.dataHora)}</p>
+                    <p><strong>👤 Profissional:</strong> {agendamento.profissional?.nome || 'Não informado'}</p>
+                    <p><strong>💰 Valor:</strong> {formatarMoeda(agendamento.servico?.preco)}</p>
+                    {agendamento.pagamentoParcial && (
+                      <p style={{ fontSize: '0.9rem', color: 'var(--warning)' }}>
+                        ⚠️ Pagamento parcial (50%)
                       </p>
-                      <p style={{ margin: '5px 0' }}>
-                        <strong>👤 Profissional:</strong> {agendamento.profissional?.nome || 'Não informado'}
-                      </p>
-                      <p style={{ margin: '5px 0' }}>
-                        <strong>💰 Valor:</strong> {formatarMoeda(agendamento.servico?.preco)}
-                      </p>
-                      {agendamento.pagamentoParcial && (
-                        <p style={{ fontSize: '0.9rem', color: 'var(--warning)', margin: '5px 0' }}>
-                          ⚠️ Pagamento parcial (50% pago)
-                        </p>
-                      )}
-                    </div>
-
+                    )}
                     {agendamento.avaliacao && (
-                      <div style={{ 
-                        marginTop: '15px', 
-                        padding: '12px', 
-                        background: 'var(--background)', 
-                        borderRadius: '5px',
-                        borderLeft: '3px solid var(--success)'
-                      }}>
-                        <p style={{ margin: '0 0 8px 0' }}>
-                          <strong>⭐ Sua avaliação:</strong> {agendamento.avaliacao.nota}/5
-                        </p>
-                        <p style={{ fontSize: '0.9rem', color: 'var(--text-light)', margin: 0 }}>
-                          "{agendamento.avaliacao.comentario}"
+                      <div style={{ marginTop: '10px', padding: '10px', background: 'var(--background)', borderRadius: '5px' }}>
+                        <p><strong>⭐ Sua avaliação:</strong> {agendamento.avaliacao.nota}/5</p>
+                        <p style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>
+                          {agendamento.avaliacao.comentario}
                         </p>
                       </div>
                     )}
                   </div>
-                  
-                  {(podeCancelar(agendamento) || podeReagendar(agendamento) || podeAvaliar(agendamento)) && (
-                    <div className="card-footer">
-                      {podeCancelar(agendamento) && (
+                  <div className="card-footer">
+                    {podeInteragir(agendamento) && (
+                      <>
                         <button
                           className="btn btn-danger"
                           onClick={() => abrirModalCancelar(agendamento)}
                         >
-                          ❌ Cancelar
+                          Cancelar
                         </button>
-                      )}
-                      {podeReagendar(agendamento) && (
                         <button
                           className="btn btn-outline"
                           onClick={() => abrirModalReagendar(agendamento)}
                         >
-                          📝 Reagendar
+                          Reagendar
                         </button>
-                      )}
-                      {podeAvaliar(agendamento) && (
-                        <button
-                          className="btn btn-success"
-                          onClick={() => abrirModalAvaliar(agendamento)}
-                        >
-                          ⭐ Avaliar
-                        </button>
-                      )}
-                    </div>
-                  )}
+                      </>
+                    )}
+                    {podeAvaliar(agendamento) && (
+                      <button
+                        className="btn btn-success"
+                        onClick={() => abrirModalAvaliar(agendamento)}
+                      >
+                        Avaliar
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -493,11 +348,7 @@ const ClienteAgendamentos = () => {
             <div className="empty-state">
               <div className="empty-state-icon">📅</div>
               <h2 className="empty-state-title">Nenhum agendamento encontrado</h2>
-              <p>
-                {filtro === 'futuros' && 'Você não tem agendamentos futuros'}
-                {filtro === 'passados' && 'Você não tem agendamentos passados'}
-                {!filtro && 'Você ainda não fez nenhum agendamento'}
-              </p>
+              <p>Você não tem agendamentos {filtro === 'futuros' ? 'futuros' : filtro === 'passados' ? 'passados' : ''}</p>
             </div>
           )}
         </div>
@@ -505,34 +356,15 @@ const ClienteAgendamentos = () => {
 
       {/* Modal Cancelar */}
       {showModalCancelar && agendamentoSelecionado && (
-        <div className="modal-overlay" onClick={() => !processando && setShowModalCancelar(false)}>
+        <div className="modal-overlay" onClick={() => setShowModalCancelar(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title">⚠️ Confirmar Cancelamento</h2>
-              <button 
-                className="modal-close" 
-                onClick={() => setShowModalCancelar(false)}
-                disabled={processando}
-              >
-                ×
-              </button>
+              <h2 className="modal-title">Confirmar Cancelamento</h2>
+              <button className="modal-close" onClick={() => setShowModalCancelar(false)}>×</button>
             </div>
-            
-            <p style={{ marginBottom: '15px' }}>
-              Tem certeza que deseja cancelar este agendamento?
-            </p>
-            
-            <div style={{ 
-              padding: '15px', 
-              backgroundColor: 'var(--background)', 
-              borderRadius: '5px',
-              marginBottom: '15px'
-            }}>
-              <p><strong>Serviço:</strong> {agendamentoSelecionado.servico?.nome}</p>
-              <p><strong>Data/Hora:</strong> {formatarData(agendamentoSelecionado.dataHora)}</p>
-              <p><strong>Profissional:</strong> {agendamentoSelecionado.profissional?.nome}</p>
-            </div>
-
+            <p>Tem certeza que deseja cancelar este agendamento?</p>
+            <p><strong>{agendamentoSelecionado.servico?.nome}</strong></p>
+            <p>{formatarData(agendamentoSelecionado.dataHora)}</p>
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button
                 className="btn btn-secondary"
@@ -540,7 +372,7 @@ const ClienteAgendamentos = () => {
                 onClick={() => setShowModalCancelar(false)}
                 disabled={processando}
               >
-                Não, manter agendamento
+                Não
               </button>
               <button
                 className="btn btn-danger"
@@ -548,7 +380,7 @@ const ClienteAgendamentos = () => {
                 onClick={handleCancelar}
                 disabled={processando}
               >
-                {processando ? 'Cancelando...' : 'Sim, cancelar'}
+                {processando ? 'Cancelando...' : 'Sim, Cancelar'}
               </button>
             </div>
           </div>
@@ -557,30 +389,12 @@ const ClienteAgendamentos = () => {
 
       {/* Modal Reagendar */}
       {showModalReagendar && agendamentoSelecionado && (
-        <div className="modal-overlay" onClick={() => !processando && setShowModalReagendar(false)}>
+        <div className="modal-overlay" onClick={() => setShowModalReagendar(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title">📝 Solicitar Reagendamento</h2>
-              <button 
-                className="modal-close" 
-                onClick={() => setShowModalReagendar(false)}
-                disabled={processando}
-              >
-                ×
-              </button>
+              <h2 className="modal-title">Reagendar Atendimento</h2>
+              <button className="modal-close" onClick={() => setShowModalReagendar(false)}>×</button>
             </div>
-            
-            <div style={{ 
-              padding: '15px', 
-              backgroundColor: 'var(--background)', 
-              borderRadius: '5px',
-              marginBottom: '20px'
-            }}>
-              <p><strong>Agendamento atual:</strong></p>
-              <p>{agendamentoSelecionado.servico?.nome}</p>
-              <p>{formatarData(agendamentoSelecionado.dataHora)}</p>
-            </div>
-
             <form onSubmit={handleReagendar}>
               <div className="form-group">
                 <label className="form-label">Nova Data e Hora *</label>
@@ -590,41 +404,14 @@ const ClienteAgendamentos = () => {
                   value={novaDataHora}
                   onChange={(e) => setNovaDataHora(e.target.value)}
                   required
-                  min={getMinDateTime()}
+                  min={new Date().toISOString().slice(0, 16)}
                 />
-                <small style={{ color: 'var(--text-light)', fontSize: '0.85rem', display: 'block', marginTop: '5px' }}>
-                  ⏰ Horário: Segunda a Sábado, das 8h às 18h
+                <small style={{ color: 'var(--text-light)', fontSize: '0.85rem' }}>
+                  Horário de funcionamento: 8h às 18h
                 </small>
               </div>
               
-              <div className="form-group">
-                <label className="form-label">Motivo (opcional)</label>
-                <textarea
-                  className="form-control"
-                  value={descricaoReagendamento}
-                  onChange={(e) => setDescricaoReagendamento(e.target.value)}
-                  rows="3"
-                  maxLength="500"
-                  placeholder="Descreva o motivo do reagendamento (opcional)"
-                />
-                <small style={{ color: 'var(--text-light)', fontSize: '0.85rem' }}>
-                  {descricaoReagendamento.length}/500 caracteres
-                </small>
-              </div>
-
-              <div style={{ 
-                padding: '12px', 
-                backgroundColor: '#fff3cd', 
-                borderRadius: '5px',
-                marginBottom: '15px',
-                border: '1px solid #ffc107'
-              }}>
-                <p style={{ margin: 0, fontSize: '0.9rem', color: '#856404' }}>
-                  ℹ️ Sua solicitação será enviada ao administrador para aprovação
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                 <button
                   type="button"
                   className="btn btn-secondary"
@@ -640,7 +427,7 @@ const ClienteAgendamentos = () => {
                   style={{ flex: 1 }}
                   disabled={processando}
                 >
-                  {processando ? 'Enviando...' : 'Enviar Solicitação'}
+                  {processando ? 'Reagendando...' : 'Confirmar Reagendamento'}
                 </button>
               </div>
             </form>
@@ -650,40 +437,16 @@ const ClienteAgendamentos = () => {
 
       {/* Modal Avaliar */}
       {showModalAvaliar && agendamentoSelecionado && (
-        <div className="modal-overlay" onClick={() => !processando && setShowModalAvaliar(false)}>
+        <div className="modal-overlay" onClick={() => setShowModalAvaliar(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title">⭐ Avaliar Atendimento</h2>
-              <button 
-                className="modal-close" 
-                onClick={() => setShowModalAvaliar(false)}
-                disabled={processando}
-              >
-                ×
-              </button>
+              <h2 className="modal-title">Avaliar Atendimento</h2>
+              <button className="modal-close" onClick={() => setShowModalAvaliar(false)}>×</button>
             </div>
-            
-            <div style={{ 
-              padding: '15px', 
-              backgroundColor: 'var(--background)', 
-              borderRadius: '5px',
-              marginBottom: '20px'
-            }}>
-              <p><strong>Serviço:</strong> {agendamentoSelecionado.servico?.nome}</p>
-              <p><strong>Profissional:</strong> {agendamentoSelecionado.profissional?.nome}</p>
-              <p><strong>Data:</strong> {formatarData(agendamentoSelecionado.dataHora)}</p>
-            </div>
-
             <form onSubmit={handleAvaliar}>
               <div className="form-group">
                 <label className="form-label">Nota (1 a 5) *</label>
-                <div style={{ 
-                  display: 'flex', 
-                  gap: '15px', 
-                  fontSize: '2.5rem', 
-                  justifyContent: 'center',
-                  margin: '20px 0'
-                }}>
+                <div style={{ display: 'flex', gap: '10px', fontSize: '2rem', justifyContent: 'center' }}>
                   {[1, 2, 3, 4, 5].map((nota) => (
                     <span
                       key={nota}
@@ -691,44 +454,32 @@ const ClienteAgendamentos = () => {
                       style={{
                         cursor: 'pointer',
                         color: nota <= avaliacao.nota ? 'gold' : 'lightgray',
-                        transition: 'all 0.2s',
-                        transform: nota <= avaliacao.nota ? 'scale(1.1)' : 'scale(1)',
-                        textShadow: nota <= avaliacao.nota ? '0 0 10px rgba(255, 215, 0, 0.5)' : 'none'
+                        transition: 'all 0.2s'
                       }}
                     >
                       ⭐
                     </span>
                   ))}
                 </div>
-                <p style={{ 
-                  textAlign: 'center', 
-                  marginTop: '10px', 
-                  color: 'var(--primary-color)',
-                  fontWeight: 'bold',
-                  fontSize: '1.1rem'
-                }}>
+                <p style={{ textAlign: 'center', marginTop: '10px', color: 'var(--primary-color)' }}>
                   {avaliacao.nota} {avaliacao.nota === 1 ? 'estrela' : 'estrelas'}
                 </p>
               </div>
-              
               <div className="form-group">
-                <label className="form-label">Seu comentário *</label>
+                <label className="form-label">Comentário *</label>
                 <textarea
                   className="form-control"
                   value={avaliacao.comentario}
                   onChange={(e) => setAvaliacao({ ...avaliacao, comentario: e.target.value })}
-                  rows="5"
+                  rows="4"
                   required
-                  minLength="10"
                   maxLength="500"
-                  placeholder="Conte-nos sobre sua experiência... O que você achou do atendimento? O profissional foi atencioso? O resultado foi satisfatório?"
-                  style={{ resize: 'vertical' }}
+                  placeholder="Conte-nos sobre sua experiência..."
                 />
                 <small style={{ color: 'var(--text-light)', fontSize: '0.85rem' }}>
-                  {avaliacao.comentario.length}/500 caracteres (mínimo 10)
+                  {avaliacao.comentario.length}/500 caracteres
                 </small>
               </div>
-
               <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                 <button
                   type="button"
@@ -743,7 +494,7 @@ const ClienteAgendamentos = () => {
                   type="submit"
                   className="btn btn-success"
                   style={{ flex: 1 }}
-                  disabled={processando || avaliacao.comentario.length < 10}
+                  disabled={processando}
                 >
                   {processando ? 'Enviando...' : 'Enviar Avaliação'}
                 </button>

@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import com.fasterxml.jackson.annotation.JsonIgnore;
+// Removido @JsonIgnore
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -22,7 +22,7 @@ public class Especialidade {
     private String nome;
     private String descricao;
 
-    @JsonIgnore
+    // @JsonIgnore REMOVIDO DAQUI
     @ManyToMany(mappedBy = "especialidades")
     private List<Profissional> profissionais = new ArrayList<>();
     
@@ -32,7 +32,7 @@ public class Especialidade {
         joinColumns = @JoinColumn(name = "especialidade_id"), // FK de Especialidade
         inverseJoinColumns = @JoinColumn(name = "servico_id") // FK de Servico
     )
-    @JsonIgnore
+    // @JsonIgnore REMOVIDO DAQUI
     private Set<Servico> servicos = new HashSet<>();
 
 

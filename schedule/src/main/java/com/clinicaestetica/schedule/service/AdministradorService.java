@@ -28,6 +28,7 @@ import com.clinicaestetica.schedule.model.Administrador;
 import com.clinicaestetica.schedule.enums.StatusSolicitacao;
 import com.clinicaestetica.schedule.enums.TipoSolicitacaoAgendamento;
 import com.clinicaestetica.schedule.enums.StatusAgendamento;
+import org.springframework.transaction.annotation.Transactional; // Importe isto
 
 @Service
 public class AdministradorService {
@@ -64,11 +65,18 @@ public class AdministradorService {
         return Optional.empty();
     }
     
+    // CORRIGIDO: Agora transacional e remove associações
+    @Transactional
     public Profissional deletarProfissional(Long id){ 
         Profissional profissional = profissionalRepository.findById(id)
             .orElseThrow(() -> new NoSuchElementException("Profissional com id " + id + " não encontrado"));
 
-        profissionalRepository.deleteById(id);
+        // Limpa as associações com especialidades (lado proprietário da relação)
+        profissional.getEspecialidades().clear();
+        profissionalRepository.save(profissional); // Salva a entidade para atualizar a tabela de junção
+
+        // Agora pode apagar o profissional
+        profissionalRepository.delete(profissional);
 
         return profissional;
     }

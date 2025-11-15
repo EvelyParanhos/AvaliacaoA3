@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// CORRIGIDO: Removi 'useNavigate' que não era necessário
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { clienteAPI, servicoAPI } from '../../services/api';
@@ -13,16 +14,17 @@ const ClienteDashboard = () => {
 
   useEffect(() => {
     carregarDados();
-  }, []);
+  }, [user.idUsuario]); // Adicionado user.idUsuario
 
   const carregarDados = async () => {
+    if (!user?.idUsuario) return; // Garante que o usuário exista
     try {
       setLoading(true);
       
       // Buscar agendamentos futuros
       const agendamentosRes = await clienteAPI.buscarAgendamentos(user.idUsuario, 'futuros');
       
-      // CORREÇÃO: Filtrar apenas AGENDADO e ALTERADO (não cancelados)
+      // Filtrar apenas AGENDADO e ALTERADO (não cancelados/concluídos)
       const agendamentosFiltrados = agendamentosRes.data.filter(ag => 
         ag.status === 'AGENDADO' || ag.status === 'ALTERADO'
       );
@@ -170,7 +172,7 @@ const ClienteDashboard = () => {
                             {formatarMoeda(servico.preco)}
                           </span>
                           <span style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>
-                            {servico.duracao_em_minutos || 0} min
+                            {servico.duracaoEmMinutos || 0} min
                           </span>
                         </div>
                       </div>
@@ -201,7 +203,10 @@ const ClienteDashboard = () => {
                 <Link to="/cliente/agendamentos" className="btn btn-outline">
                   📅 Meus Agendamentos
                 </Link>
-                <Link to="/cliente/historico" className="btn btn-outline">
+                {/* *** A CORREÇÃO ESTÁ AQUI ***
+                  Removi o 'onClick' e adicionei a propriedade 'state' ao Link.
+                */}
+                <Link to="/cliente/agendamentos" state={{ filtro: 'passados' }} className="btn btn-outline">
                   📊 Histórico
                 </Link>
               </div>

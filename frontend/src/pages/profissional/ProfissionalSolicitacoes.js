@@ -14,33 +14,26 @@ const ProfissionalSolicitacoes = () => {
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
 
+  // --- ADICIONADO ---
+  const [novaDataHora, setNovaDataHora] = useState('');
+  // --- FIM ADICIONADO ---
+
   useEffect(() => {
     carregarAgendamentos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user.idUsuario]); // Adicionado user.idUsuario
 
   const carregarAgendamentos = async () => {
-    if (!user?.idUsuario) {
-      toast.error('Usuário não identificado');
-      return;
-    }
-
     try {
       setLoading(true);
       const response = await profissionalAPI.buscarAgendamentos(user.idUsuario);
       
-      if (!response.data) {
-        setAgendamentos([]);
-        return;
-      }
-
-      // CORREÇÃO: Filtrar apenas agendamentos ativos do profissional logado
-      const agora = new Date();
+      // Filtra agendamentos futuros E que não estejam cancelados
       const agendamentosAtivos = Array.from(response.data)
         .filter(a => 
           a.profissional?.idUsuario === user.idUsuario &&
-          a.status === 'AGENDADO' &&
-          new Date(a.dataHora) > agora
+          a.status !== 'CANCELADO' && // Não pode solicitar em cancelado
+          a.status !== 'CONCLUÍDO' && // Não pode solicitar em concluído
+          new Date(a.dataHora) > new Date()
         )
         .sort((a, b) => new Date(a.dataHora) - new Date(b.dataHora));
         
@@ -48,7 +41,6 @@ const ProfissionalSolicitacoes = () => {
     } catch (error) {
       console.error('Erro:', error);
       toast.error('Erro ao carregar agendamentos');
-      setAgendamentos([]);
     } finally {
       setLoading(false);
     }
@@ -59,25 +51,26 @@ const ProfissionalSolicitacoes = () => {
       toast.error('Agendamento inválido');
       return;
     }
+
+    // --- REGRA DE NEGÓCIO: Verifica se já existe solicitação PENDENTE ---
+    const temPendente = agendamento.solicitacoes?.some(s => s.status === 'PENDENTE');
+    if (temPendente) {
+        toast.error('Este agendamento já possui uma solicitação pendente.');
+        return;
+    }
+
     setAgendamentoSelecionado(agendamento);
     setTipo('CANCELAR');
     setDescricao('');
+    setNovaDataHora(''); // Limpa a data
     setShowModal(true);
   };
 
   const handleEnviar = async (e) => {
     e.preventDefault();
     
-    // VALIDAÇÕES BÁSICAS
-    if (!agendamentoSelecionado?.idAgendamento) {
-      toast.error('Agendamento inválido');
-      console.error('Agendamento selecionado:', agendamentoSelecionado);
-      return;
-    }
-    
-    if (!user?.idUsuario) {
-      toast.error('Usuário não identificado');
-      console.error('User:', user);
+    if (!agendamentoSelecionado?.idAgendamento || !user?.idUsuario) {
+      toast.error('Agendamento ou Usuário inválido');
       return;
     }
 
@@ -85,60 +78,104 @@ const ProfissionalSolicitacoes = () => {
       toast.error('Por favor, descreva o motivo da solicitação');
       return;
     }
+    
+    // --- LÓGICA MODIFICADA ---
+    let solicitacaoData;
+    let apiCall;
 
-    if (descricao.trim().length < 10) {
-      toast.error('A descrição deve ter pelo menos 10 caracteres');
-      return;
+    if (tipo === 'ALTERAR') {
+      if (!novaDataHora) {
+        toast.error('Por favor, informe a nova data e hora sugerida.');
+        return;
+      }
+      
+      // Validar horário de funcionamento
+      const dataHoraSelecionada = new Date(novaDataHora);
+      const hora = dataHoraSelecionada.getHours();
+      
+      if (hora < 8 || hora >= 18) {
+        toast.error('Horário fora do expediente. Funcionamos das 8h às 18h.');
+        return;
+      }
+      if (dataHoraSelecionada < new Date()) {
+        toast.error('Não é possível reagendar para data passada');
+        return;
+      }
+      
+      // DTO de Reagendamento
+      solicitacaoData = {
+        agendamentoId: agendamentoSelecionado.idAgendamento,
+        profissionalId: user.idUsuario,
+        descricao: descricao.trim(),
+        novaDataHora: novaDataHora
+      };
+      apiCall = solicitacaoAPI.criarReagendamento;
+
+    } else {
+      // DTO de Cancelamento (simples)
+      solicitacaoData = {
+        agendamentoId: agendamentoSelecionado.idAgendamento,
+        profissionalId: user.idUsuario,
+        descricao: descricao.trim(),
+        tipo: 'CANCELAR'
+      };
+      apiCall = solicitacaoAPI.criar;
     }
     
     setEnviando(true);
 
     try {
-      // CORREÇÃO: Enviar dados no formato correto
-      const solicitacao = {
-        agendamentoId: agendamentoSelecionado.idAgendamento,
-        profissionalId: user.idUsuario,
-        descricao: descricao.trim(),
-        tipo: tipo
-      };
-
-      console.log('Enviando solicitação:', solicitacao);
-      
-      const response = await solicitacaoAPI.criar(solicitacao);
+      const response = await apiCall(solicitacaoData);
       
       if (response.status === 201) {
-        toast.success('Solicitação enviada com sucesso! Aguarde aprovação do administrador.');
+        toast.success('Solicitação enviada com sucesso! Aguarde aprovação.');
         setShowModal(false);
         setDescricao('');
-        setAgendamentoSelecionado(null);
-        carregarAgendamentos();
+        setNovaDataHora('');
+        carregarAgendamentos(); // Recarrega a lista
       }
     } catch (error) {
-      console.error('Erro completo:', error);
-      console.error('Response:', error.response);
-      
+      // O backend agora retorna a mensagem de "solicitação pendente", etc.
       const mensagem = error.response?.data?.message || 
                       error.response?.data || 
-                      'Erro ao enviar solicitação. Verifique os dados e tente novamente.';
+                      'Erro ao enviar solicitação';
       toast.error(mensagem);
+      console.error('Erro ao enviar:', error);
     } finally {
       setEnviando(false);
     }
+    // --- FIM DA LÓGICA MODIFICADA ---
   };
 
   const formatarData = (dataHora) => {
     if (!dataHora) return 'Data inválida';
-    try {
-      return new Date(dataHora).toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      return 'Data inválida';
+    return new Date(dataHora).toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Helper para mostrar status das solicitações
+  const getSolicitacaoStatus = (agendamento) => {
+    if (!agendamento.solicitacoes || agendamento.solicitacoes.length === 0) {
+      return null;
     }
+    const pendente = agendamento.solicitacoes.find(s => s.status === 'PENDENTE');
+    if (pendente) {
+      return <span className="badge badge-warning">Solicitação Pendente</span>;
+    }
+    // Mostra a mais recente se não houver pendente
+    const maisRecente = agendamento.solicitacoes.sort((a, b) => new Date(b.dataCriacao) - new Date(a.dataCriacao))[0];
+    if (maisRecente.status === 'APROVADA') {
+      return <span className="badge badge-success">Solicitação Aprovada</span>;
+    }
+    if (maisRecente.status === 'RECUSADA') {
+      return <span className="badge badge-error">Solicitação Recusada</span>;
+    }
+    return null;
   };
 
   if (loading) {
@@ -148,7 +185,6 @@ const ProfissionalSolicitacoes = () => {
         <div className="container">
           <div className="loading-container">
             <div className="spinner"></div>
-            <p>Carregando agendamentos...</p>
           </div>
         </div>
       </>
@@ -160,24 +196,11 @@ const ProfissionalSolicitacoes = () => {
       <Navbar />
       <div className="container fade-in">
         <h1 style={{ color: 'var(--primary-color)', marginBottom: '10px' }}>
-          Solicitar Alteração/Cancelamento 📋
+          Solicitar Alteração/Cancelamento
         </h1>
         <p style={{ color: 'var(--text-light)', marginBottom: '30px' }}>
           Envie uma solicitação ao administrador para alterar ou cancelar um agendamento
         </p>
-
-        <div style={{ 
-          padding: '15px', 
-          backgroundColor: '#e3f2fd', 
-          borderRadius: '5px',
-          marginBottom: '20px',
-          border: '1px solid #2196f3'
-        }}>
-          <p style={{ margin: 0, fontSize: '0.95rem', color: '#1565c0' }}>
-            ℹ️ <strong>Importante:</strong> Todas as solicitações precisam ser aprovadas pelo administrador. 
-            Você receberá uma notificação após a análise.
-          </p>
-        </div>
 
         <div className="card">
           <div className="card-header">Seus Agendamentos Ativos</div>
@@ -190,63 +213,61 @@ const ProfissionalSolicitacoes = () => {
                       <th>Data/Hora</th>
                       <th>Cliente</th>
                       <th>Serviço</th>
+                      <th>Status Solicitação</th>
                       <th>Ação</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {agendamentos.map(ag => (
-                      <tr key={ag.idAgendamento}>
-                        <td>{formatarData(ag.dataHora)}</td>
-                        <td>{ag.cliente?.nome || 'Cliente não informado'}</td>
-                        <td>{ag.servico?.nome || 'Serviço não informado'}</td>
-                        <td>
-                          <button
-                            className="btn btn-outline"
-                            onClick={() => abrirModal(ag)}
-                          >
-                            📝 Solicitar
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {agendamentos.map(ag => {
+                      const statusSolicitacao = getSolicitacaoStatus(ag);
+                      // CORRIGIDO: Só pode solicitar se não tiver pendente ou aprovada
+                      const podeSolicitar = ag.status === 'AGENDADO' && (!statusSolicitacao || statusSolicitacao.props.children === 'Solicitação Recusada');
+
+                      return (
+                        <tr key={ag.idAgendamento}>
+                          <td>{formatarData(ag.dataHora)}</td>
+                          <td>{ag.cliente?.nome || 'Cliente não informado'}</td>
+                          <td>{ag.servico?.nome || 'Serviço não informado'}</td>
+                          <td>{statusSolicitacao || 'Nenhuma'}</td>
+                          <td>
+                            <button
+                              className="btn btn-outline"
+                              onClick={() => abrirModal(ag)}
+                              disabled={!podeSolicitar} // Desabilita se tiver pendente ou aprovada
+                            >
+                              {podeSolicitar ? 'Solicitar' : (ag.status !== 'AGENDADO' ? ag.status : 'Processando')}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             ) : (
               <div className="empty-state">
                 <div className="empty-state-icon">📅</div>
-                <h2 className="empty-state-title">Nenhum agendamento ativo</h2>
-                <p>Você não tem agendamentos futuros para gerenciar</p>
+                <p>Nenhum agendamento ativo</p>
               </div>
             )}
           </div>
         </div>
       </div>
 
+      {/* --- MODAL MODIFICADO --- */}
       {showModal && agendamentoSelecionado && (
-        <div className="modal-overlay" onClick={() => !enviando && setShowModal(false)}>
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Nova Solicitação</h2>
-              <button 
-                className="modal-close" 
-                onClick={() => setShowModal(false)}
-                disabled={enviando}
-              >
-                ×
-              </button>
+              <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
             </div>
             
-            <div style={{ 
-              marginBottom: '20px', 
-              padding: '15px', 
-              backgroundColor: 'var(--background)', 
-              borderRadius: '5px' 
-            }}>
-              <p style={{ margin: '5px 0' }}><strong>Agendamento:</strong></p>
-              <p style={{ margin: '5px 0' }}>Cliente: {agendamentoSelecionado.cliente?.nome}</p>
-              <p style={{ margin: '5px 0' }}>Serviço: {agendamentoSelecionado.servico?.nome}</p>
-              <p style={{ margin: '5px 0' }}>Data/Hora: {formatarData(agendamentoSelecionado.dataHora)}</p>
+            <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: 'var(--background)', borderRadius: '5px' }}>
+              <p><strong>Agendamento:</strong></p>
+              <p>Cliente: {agendamentoSelecionado.cliente?.nome}</p>
+              <p>Serviço: {agendamentoSelecionado.servico?.nome}</p>
+              <p>Data/Hora: {formatarData(agendamentoSelecionado.dataHora)}</p>
             </div>
 
             <form onSubmit={handleEnviar}>
@@ -257,17 +278,29 @@ const ProfissionalSolicitacoes = () => {
                   value={tipo} 
                   onChange={(e) => setTipo(e.target.value)} 
                   required
-                  disabled={enviando}
                 >
                   <option value="CANCELAR">Cancelamento</option>
-                  <option value="ALTERAR">Alteração</option>
+                  <option value="ALTERAR">Alteração (Reagendamento)</option>
                 </select>
-                <small style={{ color: 'var(--text-light)', fontSize: '0.85rem', display: 'block', marginTop: '5px' }}>
-                  {tipo === 'CANCELAR' 
-                    ? '🚫 Solicite o cancelamento deste agendamento' 
-                    : '✏️ Solicite uma alteração (data, horário, etc.)'}
-                </small>
               </div>
+
+              {/* CAMPO CONDICIONAL DE DATA/HORA */}
+              {tipo === 'ALTERAR' && (
+                <div className="form-group">
+                  <label className="form-label">Nova Data e Hora Sugerida *</label>
+                  <input
+                    type="datetime-local"
+                    className="form-control"
+                    value={novaDataHora}
+                    onChange={(e) => setNovaDataHora(e.target.value)}
+                    required
+                    min={new Date().toISOString().slice(0, 16)}
+                  />
+                  <small style={{ color: 'var(--text-light)', fontSize: '0.85rem' }}>
+                    Horário de funcionamento: 8h às 18h
+                  </small>
+                </div>
+              )}
 
               <div className="form-group">
                 <label className="form-label">Motivo da Solicitação *</label>
@@ -276,29 +309,13 @@ const ProfissionalSolicitacoes = () => {
                   value={descricao}
                   onChange={(e) => setDescricao(e.target.value)}
                   required
-                  minLength="10"
-                  rows="5"
+                  rows="4"
                   maxLength="500"
-                  placeholder="Descreva detalhadamente o motivo da sua solicitação... (mínimo 10 caracteres)"
-                  disabled={enviando}
-                  style={{ resize: 'vertical' }}
+                  placeholder="Descreva o motivo da sua solicitação..."
                 />
                 <small style={{ color: 'var(--text-light)', fontSize: '0.85rem' }}>
-                  {descricao.length}/500 caracteres (mínimo 10)
+                  {descricao.length}/500 caracteres
                 </small>
-              </div>
-
-              <div style={{ 
-                padding: '12px', 
-                backgroundColor: '#fff3cd', 
-                borderRadius: '5px',
-                marginBottom: '15px',
-                border: '1px solid #ffc107'
-              }}>
-                <p style={{ margin: 0, fontSize: '0.9rem', color: '#856404' }}>
-                  ⚠️ <strong>Atenção:</strong> Esta solicitação será enviada ao administrador para aprovação. 
-                  Você será notificado sobre a decisão.
-                </p>
               </div>
 
               <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
@@ -315,9 +332,9 @@ const ProfissionalSolicitacoes = () => {
                   type="submit" 
                   className="btn btn-primary" 
                   style={{ flex: 1 }} 
-                  disabled={enviando || descricao.trim().length < 10}
+                  disabled={enviando || !descricao.trim() || (tipo === 'ALTERAR' && !novaDataHora)}
                 >
-                  {enviando ? 'Enviando...' : '📤 Enviar Solicitação'}
+                  {enviando ? 'Enviando...' : 'Enviar Solicitação'}
                 </button>
               </div>
             </form>

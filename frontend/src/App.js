@@ -26,7 +26,8 @@ import AdminSolicitacoes from './pages/admin/AdminSolicitacoes';
 import AdminProfissionais from './pages/admin/AdminProfissionais';
 import AdminServicos from './pages/admin/AdminServicos';
 import AdminCalendario from './pages/admin/AdminCalendario';
-import AdminEspecialidades from './pages/admin/AdminEspecialidades';
+import AdminEspecialidades from './pages/admin/AdminEspecialidades'; // <-- ADICIONADO
+import AdminHistorico from './pages/admin/AdminHistorico'; // <-- ADICIONADO
 
 function App() {
   return (
@@ -132,6 +133,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* ROTA ADICIONADA */}
             <Route
               path="/admin/especialidades"
               element={
@@ -148,11 +150,12 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* ROTA MODIFICADA */}
             <Route
               path="/admin/historico"
               element={
                 <ProtectedRoute allowedUserTypes={['administrador']}>
-                  <AdminCalendario />
+                  <AdminHistorico />
                 </ProtectedRoute>
               }
             />

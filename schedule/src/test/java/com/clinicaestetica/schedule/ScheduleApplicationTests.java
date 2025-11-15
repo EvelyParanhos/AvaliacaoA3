@@ -91,7 +91,7 @@ class ScheduleApplicationTests {
 
     private Agendamento criarAgendamentoMock(StatusAgendamento status, LocalDateTime dataHora) {
         Agendamento agendamento = new Agendamento();
-        agendamento.setId(1L);
+        agendamento.setIdAgendamento(1L);
         agendamento.setDataHora(dataHora);
         agendamento.setStatus(status);
         agendamento.setCliente(criarClienteMock());
@@ -351,12 +351,12 @@ class ScheduleApplicationTests {
     void testCancelarAgendamentoFalha24Horas() {
         // Configura mock para simular a falha na regra de 24h
         Agendamento agendamentoProximo = criarAgendamentoMockProximo(StatusAgendamento.AGENDADO, 1L);
-        when(agendamentoService.cancelarAgendamento(agendamentoProximo.getId()))
+        when(agendamentoService.cancelarAgendamento(agendamentoProximo.getIdAgendamento()))
             .thenThrow(new RuntimeException("Não é possível cancelar agendamento com menos de 24h."));
 
         // Executa e verifica a exceção
         Exception exception = assertThrows(RuntimeException.class, () ->
-            agendamentoService.cancelarAgendamento(agendamentoProximo.getId()));
+            agendamentoService.cancelarAgendamento(agendamentoProximo.getIdAgendamento()));
 
         // Verifica
         assertEquals("Não é possível cancelar agendamento com menos de 24h.", exception.getMessage());
@@ -443,8 +443,8 @@ class ScheduleApplicationTests {
 
         // Verifica
         assertTrue(agendamento.isPresent());
-        assertEquals(1L, agendamento.get().getId());
-        System.out.println("TESTE: Agendamento encontrado: " + agendamento.get().getId());
+        assertEquals(1L, agendamento.get().getIdAgendamento());
+        System.out.println("TESTE: Agendamento encontrado: " + agendamento.get().getIdAgendamento());
     }
 
     @Test
@@ -607,7 +607,7 @@ class ScheduleApplicationTests {
 
         // Verifica
         assertNotNull(resultado);
-        assertEquals(1L, resultado.getId());
+        assertEquals(1L, resultado.getIdAgendamento());
         System.out.println("TESTE: Deletar Agendamento realizado com sucesso.");
     }
 
