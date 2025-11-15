@@ -19,19 +19,23 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
             StatusAgendamento statusIgnorar
     );
 
-    // CORRIGIDO: Buscar apenas agendamentos futuros que estão AGENDADO ou ALTERADO (não cancelados)
     @Query("SELECT a FROM Agendamento a WHERE a.cliente.idUsuario = :clienteId " +
            "AND a.dataHora > :dataAtual " +
-           "AND (a.status = 'AGENDADO' OR a.status = 'ALTERADO') " +
+           "AND (a.status = :statusAgendado OR a.status = :statusAlterado) " + // MUDADO AQUI
            "ORDER BY a.dataHora ASC")
-    List<Agendamento> findAgendamentosFuturos(@Param("clienteId") Long clienteId, @Param("dataAtual") LocalDateTime dataAtual);
+    List<Agendamento> findAgendamentosFuturos(@Param("clienteId") Long clienteId, 
+                                             @Param("dataAtual") LocalDateTime dataAtual,
+                                             @Param("statusAgendado") StatusAgendamento statusAgendado,    // MUDADO AQUI
+                                             @Param("statusAlterado") StatusAgendamento statusAlterado); // MUDADO AQUI
 
-    // Buscar agendamentos passados de um cliente (concluídos ou cancelados)
+    // CORRIGIDO: Buscar agendamentos passados de um cliente
     @Query("SELECT a FROM Agendamento a WHERE a.cliente.idUsuario = :clienteId " +
-           "AND (a.dataHora <= :dataAtual OR a.status = 'CONCLUÍDO' OR a.status = 'CANCELADO') " +
+           "AND (a.dataHora <= :dataAtual OR a.status = :statusConcluido OR a.status = :statusCancelado) " + // MUDADO AQUI
            "ORDER BY a.dataHora DESC")
-    List<Agendamento> findAgendamentosPassados(@Param("clienteId") Long clienteId, @Param("dataAtual") LocalDateTime dataAtual);
-
+    List<Agendamento> findAgendamentosPassados(@Param("clienteId") Long clienteId, 
+                                             @Param("dataAtual") LocalDateTime dataAtual,
+                                             @Param("statusConcluido") StatusAgendamento statusConcluido,  // MUDADO AQUI
+                                             @Param("statusCancelado") StatusAgendamento statusCancelado); // MUDADO AQUI
     // Buscar todos os agendamentos de um cliente
     @Query("SELECT a FROM Agendamento a WHERE a.cliente.idUsuario = :clienteId ORDER BY a.dataHora DESC")
     List<Agendamento> findByClienteIdUsuario(@Param("clienteId") Long clienteId);

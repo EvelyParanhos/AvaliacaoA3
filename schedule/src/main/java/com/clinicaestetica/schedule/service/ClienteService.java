@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import com.clinicaestetica.schedule.model.Cliente;
 import com.clinicaestetica.schedule.repository.ClienteRepository;
 import com.clinicaestetica.schedule.repository.AgendamentoRepository;
+import com.clinicaestetica.schedule.enums.StatusAgendamento;
 import com.clinicaestetica.schedule.model.Agendamento;
 
 @Service
@@ -46,17 +47,28 @@ public class ClienteService {
         return cliente.getAgendamentos();
     }
 
-    // Obter agendamentos futuros
     public List<Agendamento> getAgendamentosFuturos(Long id) {
         Cliente cliente = clienteRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Cliente com ID " + id + " não encontrado"));
-        return agendamentoRepository.findAgendamentosFuturos(id, LocalDateTime.now());
+        // CORRIGIDO: Passe os Enums para a query
+        return agendamentoRepository.findAgendamentosFuturos(
+            id, 
+            LocalDateTime.now(),
+            StatusAgendamento.AGENDADO,
+            StatusAgendamento.ALTERADO
+        );
     }
 
     // Obter agendamentos passados
     public List<Agendamento> getAgendamentosPassados(Long id) {
         Cliente cliente = clienteRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Cliente com ID " + id + " não encontrado"));
-        return agendamentoRepository.findAgendamentosPassados(id, LocalDateTime.now());
+        // CORRIGIDO: Passe os Enums para a query
+        return agendamentoRepository.findAgendamentosPassados(
+            id, 
+            LocalDateTime.now(),
+            StatusAgendamento.CONCLUÍDO,
+            StatusAgendamento.CANCELADO
+        );
     }
 }

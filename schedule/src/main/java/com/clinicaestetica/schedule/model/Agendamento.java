@@ -26,6 +26,7 @@ public class Agendamento {
 
     private LocalDateTime dataHora;
 
+    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
     private StatusAgendamento status;
 
     private LocalDateTime dataCancelamento;
