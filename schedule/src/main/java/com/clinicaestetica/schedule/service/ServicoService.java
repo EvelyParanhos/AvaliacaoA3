@@ -1,14 +1,14 @@
 package com.clinicaestetica.schedule.service;
 import com.clinicaestetica.schedule.repository.ServicoRepository;
-import com.clinicaestetica.schedule.repository.AgendamentoRepository; // IMPORTADO
+import com.clinicaestetica.schedule.repository.AgendamentoRepository; 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.clinicaestetica.schedule.model.Especialidade; 
 import com.clinicaestetica.schedule.model.Profissional;
 import com.clinicaestetica.schedule.model.Servico;
-import com.clinicaestetica.schedule.model.Agendamento; // IMPORTADO
-import com.clinicaestetica.schedule.enums.StatusAgendamento; // IMPORTADO
-import java.time.LocalDateTime; // IMPORTADO
+import com.clinicaestetica.schedule.model.Agendamento; 
+import com.clinicaestetica.schedule.enums.StatusAgendamento; 
+import java.time.LocalDateTime; 
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors; 
@@ -20,7 +20,6 @@ public class ServicoService {
     @Autowired
     private ServicoRepository servicoRepository;
 
-    // INJETADO O REPOSITÓRIO DE AGENDAMENTO
     @Autowired
     private AgendamentoRepository agendamentoRepository;
 
@@ -56,13 +55,11 @@ public class ServicoService {
         List<Agendamento> agendamentos = agendamentoRepository.findByServicoId(id);
         for (Agendamento agendamento : agendamentos) {
             
-            // Cancela apenas o que não está Concluído ou já Cancelado
             if (agendamento.getStatus() == StatusAgendamento.AGENDADO || agendamento.getStatus() == StatusAgendamento.ALTERADO) {
                 agendamento.setStatus(StatusAgendamento.CANCELADO);
                 agendamento.setDataCancelamento(LocalDateTime.now());
             }
             // *** A CORREÇÃO CRÍTICA ESTÁ AQUI ***
-            // Quebra o elo entre o agendamento e o serviço que será excluído
             agendamento.setServico(null); 
         }
         agendamentoRepository.saveAll(agendamentos);
@@ -77,7 +74,6 @@ public class ServicoService {
         servicoRepository.delete(servico);
     }
 
-    // --- MÉTODO EDITAR (NOVO) ---
     @Transactional
     public Servico atualizarServico(Long id, Servico servicoAtualizado) {
         Servico servicoExistente = servicoRepository.findById(id)

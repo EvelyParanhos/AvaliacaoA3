@@ -37,16 +37,16 @@ public class Agendamento {
     @JsonManagedReference(value = "agendamento-pagamento")
     private Pagamento pagamento;
 
-    @ManyToOne
-    @JoinColumn(name = "cliente_id", nullable = false)
+    @ManyToOne(cascade = CascadeType.MERGE) // <-- ADICIONE/CONFIRME O MERGE
+    @JoinColumn(name = "cliente_id")
     private Cliente cliente;
 
-    @ManyToOne
-    @JoinColumn(name = "profissional_id", nullable = false)
+    @ManyToOne(cascade = CascadeType.MERGE) // <-- ADICIONE/CONFIRME O MERGE
+    @JoinColumn(name = "profissional_id")
     private Profissional profissional;
 
-    @ManyToOne
-    @JoinColumn(name = "servico_id", nullable = false)
+    @ManyToOne(cascade = CascadeType.MERGE) // <-- ADICIONE/CONFIRME O MERGE
+    @JoinColumn(name = "servico_id")
     private Servico servico;
 
     @ManyToMany

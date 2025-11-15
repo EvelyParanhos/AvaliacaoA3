@@ -65,7 +65,6 @@ public class AdministradorService {
         return Optional.empty();
     }
     
-    // --- MÉTODO DELETAR CORRIGIDO ---
     @Transactional
     public Profissional deletarProfissional(Long id){ 
         Profissional profissional = profissionalRepository.findById(id)
@@ -75,7 +74,6 @@ public class AdministradorService {
         List<Agendamento> agendamentos = agendamentoRepository.findByProfissionalIdUsuario(id);
         for (Agendamento agendamento : agendamentos) {
             
-            // Cancela apenas o que não está Concluído ou já Cancelado
             if (agendamento.getStatus() == StatusAgendamento.AGENDADO || agendamento.getStatus() == StatusAgendamento.ALTERADO) {
                 agendamento.setStatus(StatusAgendamento.CANCELADO);
                 agendamento.setDataCancelamento(LocalDateTime.now());
@@ -95,7 +93,6 @@ public class AdministradorService {
         return profissional;
     }
 
-    // Método Editar (já existia)
     @Transactional
     public Profissional atualizarProfissional(Long id, Profissional profissionalAtualizado) {
         Profissional profissionalExistente = profissionalRepository.findById(id)
