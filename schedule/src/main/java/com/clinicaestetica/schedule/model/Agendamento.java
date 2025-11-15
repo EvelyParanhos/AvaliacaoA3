@@ -42,11 +42,11 @@ public class Agendamento {
     private Cliente cliente;
 
     @ManyToOne
-    @JoinColumn(name = "profissional_id", nullable = false)
+    @JoinColumn(name = "profissional_id", nullable = true) // <<< CORRIGIDO
     private Profissional profissional;
 
     @ManyToOne
-    @JoinColumn(name = "servico_id", nullable = false)
+    @JoinColumn(name = "servico_id", nullable = true) // <<< CORRIGIDO
     private Servico servico;
 
     @ManyToMany

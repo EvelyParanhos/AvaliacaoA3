@@ -56,6 +56,13 @@ export const administradorAPI = {
     if (params.length > 0) url += '?' + params.join('&');
     return api.get(url);
   },
+
+  // --- ADICIONE ESTAS DUAS FUNÇÕES ---
+  associarServico: (especialidadeId, servicoId) => 
+    api.put(`/administrador/especialidades/${especialidadeId}/servicos/${servicoId}`),
+  
+  associarProfissional: (especialidadeId, profissionalId) => 
+    api.put(`/administrador/especialidades/${especialidadeId}/profissionais/${profissionalId}`),
 };
 
 // ========== SERVIÇO APIs ==========

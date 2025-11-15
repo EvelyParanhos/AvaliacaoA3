@@ -25,6 +25,9 @@ import com.clinicaestetica.schedule.model.Administrador;
 import com.clinicaestetica.schedule.model.Agendamento;
 import com.clinicaestetica.schedule.model.Especialidade;
 import com.clinicaestetica.schedule.service.AdministradorService;
+
+import jakarta.validation.Valid;
+
 import com.clinicaestetica.schedule.enums.StatusSolicitacao;
 
 @RestController
@@ -89,7 +92,7 @@ public class AdministradorController {
     }
 
     @PostMapping("/profissionais")
-    public ResponseEntity<Profissional> criarProfissional(@RequestBody Profissional profissional) {
+    public ResponseEntity<Profissional> criarProfissional(@Valid @RequestBody Profissional profissional) { // <<< ADICIONADO @Valid
         try {
             Profissional novoProfissional = administradorService.criarProfissional(profissional);
             return ResponseEntity.status(HttpStatus.CREATED).body(novoProfissional);

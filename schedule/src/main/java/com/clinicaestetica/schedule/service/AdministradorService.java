@@ -71,19 +71,19 @@ public class AdministradorService {
         Profissional profissional = profissionalRepository.findById(id)
             .orElseThrow(() -> new NoSuchElementException("Profissional com id " + id + " não encontrado"));
         
-        // 1. CANCELAR Agendamentos futuros vinculados
-        // (findByProfissionalIdUsuario precisa existir no AgendamentoRepository)
+        // 1. CANCELAR E DESVINCULAR Agendamentos futuros
         List<Agendamento> agendamentos = agendamentoRepository.findByProfissionalIdUsuario(id);
         for (Agendamento agendamento : agendamentos) {
-            // Cancela apenas o que não está Concluído ou já Cancelado
             if (agendamento.getStatus() == StatusAgendamento.AGENDADO || agendamento.getStatus() == StatusAgendamento.ALTERADO) {
                 agendamento.setStatus(StatusAgendamento.CANCELADO);
                 agendamento.setDataCancelamento(LocalDateTime.now());
             }
+            // <<< CORREÇÃO PRINCIPAL: Remove a referência ao profissional
+            agendamento.setProfissional(null); 
         }
-        agendamentoRepository.saveAll(agendamentos);
+        agendamentoRepository.saveAll(agendamentos); // Salva as mudanças nos agendamentos
 
-        // 2. Desvincular de Especialidades (como pedido)
+        // 2. Desvincular de Especialidades
         profissional.getEspecialidades().clear();
         profissionalRepository.save(profissional); // Salva para atualizar a tabela de junção
 

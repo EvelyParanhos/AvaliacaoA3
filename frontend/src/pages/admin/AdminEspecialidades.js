@@ -8,25 +8,29 @@ const AdminEspecialidades = () => {
   const [profissionais, setProfissionais] = useState([]);
   const [servicos, setServicos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [processando, setProcessando] = useState(false); // Para os forms
+  const [processando, setProcessando] = useState(false);
 
-  // --- Estados dos Modais ---
   const [showAssociarProfissional, setShowAssociarProfissional] = useState(false);
   const [showAssociarServico, setShowAssociarServico] = useState(false);
   const [showCriarEspecialidade, setShowCriarEspecialidade] = useState(false);
   
-  // Controla se o modal de associação está em modo "Criar" ou "Selecionar"
   const [isCreatingNew, setIsCreatingNew] = useState(false); 
 
   const [especialidadeSelecionada, setEspecialidadeSelecionada] = useState(null);
   
-  // IDs para os <select>
   const [profissionalId, setProfissionalId] = useState('');
   const [servicoId, setServicoId] = useState('');
 
   // Forms de cadastro
   const [formEspecialidade, setFormEspecialidade] = useState({ nome: '', descricao: '' });
-  const [formServico, setFormServico] = useState({ nome: '', descricao: '', preco: 0, duracao_em_minutos: 30 });
+  
+  const [formServico, setFormServico] = useState({ 
+    nome: '', 
+    descricao: '', 
+    preco: '', // Inicia como string vazia para o placeholder funcionar
+    duracao_em_minutos: 30 
+  });
+  
   const [formProfissional, setFormProfissional] = useState({
     nome: '', cpf: '', data_nascimento: '', email: '', senha: '',
     telefone: '', cep: '', complemento: '', bairro: '', cidade: '',
@@ -55,10 +59,9 @@ const AdminEspecialidades = () => {
     }
   };
 
-  // Limpa todos os formulários e seleções
   const resetarForms = () => {
     setFormEspecialidade({ nome: '', descricao: '' });
-    setFormServico({ nome: '', descricao: '', preco: 0, duracao_em_minutos: 30 });
+    setFormServico({ nome: '', descricao: '', preco: '', duracao_em_minutos: 30 });
     setFormProfissional({
       nome: '', cpf: '', data_nascimento: '', email: '', senha: '',
       telefone: '', cep: '', complemento: '', bairro: '', cidade: '',
@@ -76,7 +79,26 @@ const AdminEspecialidades = () => {
     resetarForms();
   }
 
-  // --- Handlers de ESPECIALIDADE ---
+  // --- TRATAMENTO DE ERRO GENÉRICO ---
+  const handleApiError = (error, defaultMessage) => {
+    if (error.response && error.response.status === 400) {
+      const errors = error.response.data;
+      const errorKeys = Object.keys(errors);
+      if (errorKeys.length > 0) {
+        const firstKey = errorKeys[0];
+        // Formata a mensagem de erro
+        const fieldName = firstKey.replace("duracao_em_minutos", "Duração").replace("_", " ");
+        toast.error(`${fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}: ${errors[firstKey]}`);
+      } else {
+        toast.error('Erro de validação. Verifique os campos.');
+      }
+    } else {
+      toast.error(defaultMessage);
+    }
+    console.error(error);
+  };
+  // --- FIM DO TRATAMENTO ---
+
   const handleCriarEspecialidade = async (e) => {
     e.preventDefault();
     setProcessando(true);
@@ -85,11 +107,12 @@ const AdminEspecialidades = () => {
       toast.success('Especialidade criada!');
       fecharModais();
       carregarDados();
-    } catch (error) { toast.error('Erro ao criar especialidade'); }
+    } catch (error) { 
+      handleApiError(error, 'Erro ao criar especialidade');
+    }
     finally { setProcessando(false); }
   };
 
-  // --- Handlers de ASSOCIAÇÃO (Selecionar existente) ---
   const handleAssociarProfissional = async (e) => {
     e.preventDefault();
     if (!especialidadeSelecionada || !profissionalId) return;
@@ -99,7 +122,9 @@ const AdminEspecialidades = () => {
       toast.success('Profissional associado!');
       fecharModais();
       carregarDados();
-    } catch (error) { toast.error('Erro ao associar'); }
+    } catch (error) { 
+      handleApiError(error, 'Erro ao associar profissional');
+    }
     finally { setProcessando(false); }
   };
 
@@ -112,58 +137,59 @@ const AdminEspecialidades = () => {
       toast.success('Serviço associado!');
       fecharModais();
       carregarDados();
-    } catch (error) { toast.error('Erro ao associar'); }
+    } catch (error) { 
+      handleApiError(error, 'Erro ao associar serviço');
+    }
     finally { setProcessando(false); }
   };
   
-  // --- Handlers de CADASTRO E ASSOCIAÇÃO (Sua Lógica) ---
   const handleCriarEAssociarServico = async (e) => {
     e.preventDefault();
     setProcessando(true);
+    
+    const servicoDTO = {
+      ...formServico,
+      preco: parseFloat(formServico.preco),
+      duracao_em_minutos: parseInt(formServico.duracao_em_minutos, 10)
+    };
+
     try {
-      // 1. Criar o serviço
-      const servicoResponse = await servicoAPI.criar(formServico);
+      const servicoResponse = await servicoAPI.criar(servicoDTO);
       const novoServicoId = servicoResponse.data.id;
       toast.info('Serviço criado... associando...');
       
-      // 2. Associar o serviço recém-criado
       await administradorAPI.associarServico(especialidadeSelecionada.idEspecialidade, novoServicoId);
       
       toast.success('Serviço criado e associado com sucesso!');
       fecharModais();
-      carregarDados(); // Recarrega tudo (especialidades, serviços, profissionais)
+      carregarDados();
     } catch (error) { 
-      toast.error('Erro ao criar e associar serviço'); 
-      console.error(error);
+      handleApiError(error, 'Erro ao criar e associar serviço');
     } finally { setProcessando(false); }
   };
 
   const handleCriarEAssociarProfissional = async (e) => {
     e.preventDefault();
     setProcessando(true);
+    
     try {
-      // 1. Criar o profissional
       const profResponse = await administradorAPI.criarProfissional(formProfissional);
       const novoProfissionalId = profResponse.data.idUsuario;
       toast.info('Profissional criado... associando...');
 
-      // 2. Associar o profissional recém-criado
       await administradorAPI.associarProfissional(especialidadeSelecionada.idEspecialidade, novoProfissionalId);
 
       toast.success('Profissional criado e associado com sucesso!');
       fecharModais();
-      carregarDados(); // Recarrega tudo
+      carregarDados();
     } catch (error) { 
-      toast.error('Erro ao criar e associar profissional'); 
-      console.error(error);
+       handleApiError(error, 'Erro ao criar e associar profissional');
     } finally { setProcessando(false); }
   };
   
-  // Handler genérico para os formulários
   const handleChange = (e, setForm) => {
     let { name, value } = e.target;
     
-    // Máscaras
     if (name === 'cpf') value = value.replace(/\D/g, '').slice(0, 11);
     else if (name === 'telefone') value = value.replace(/\D/g, '').slice(0, 11);
     else if (name === 'cep') value = value.replace(/\D/g, '').slice(0, 8);
@@ -172,7 +198,6 @@ const AdminEspecialidades = () => {
     setForm(prev => ({ ...prev, [name]: value }));
   };
   
-  // --- Funções para abrir modais (limpando o estado) ---
   const abrirModalAssociarServico = (esp) => {
     resetarForms();
     setEspecialidadeSelecionada(esp);
@@ -192,8 +217,15 @@ const AdminEspecialidades = () => {
 
   if (loading) {
     return (
+      <>
         <Navbar />
-        // ... (código de loading) ...
+        <div className="container">
+          <div className="loading-container">
+            <div className="spinner"></div>
+            <p>Carregando...</p>
+          </div>
+        </div>
+      </>
     );
   }
 
@@ -222,7 +254,6 @@ const AdminEspecialidades = () => {
                 <div className="card-body">
                   <p>{esp.descricao}</p>
                   
-                  {/* Lista de Profissionais Associados */}
                   <div>
                     <strong>Profissionais:</strong>
                     {esp.profissionais && esp.profissionais.length > 0 ? (
@@ -230,7 +261,6 @@ const AdminEspecialidades = () => {
                     ) : (<p style={{fontSize: '0.9rem', color: 'var(--text-light)'}}>Nenhum</p>)}
                   </div>
                   
-                  {/* Lista de Serviços Associados */}
                   <div style={{marginTop: '15px'}}>
                     <strong>Serviços:</strong>
                     {esp.servicos && esp.servicos.length > 0 ? (
@@ -256,8 +286,6 @@ const AdminEspecialidades = () => {
           </div>
         )}
       </div>
-
-      {/* --- MODAIS --- */}
 
       {/* Modal Criar Especialidade */}
       {showCriarEspecialidade && (
@@ -293,12 +321,10 @@ const AdminEspecialidades = () => {
               <button className="modal-close" onClick={fecharModais}>×</button>
             </div>
             
-            {/* Botão de Toggle */}
             <button type="button" className="btn btn-link" onClick={() => setIsCreatingNew(!isCreatingNew)}>
               {isCreatingNew ? 'Ou, selecionar um serviço existente' : 'Ou, cadastrar um novo serviço para associar'}
             </button>
 
-            {/* --- SEÇÃO DE SELECIONAR (Default) --- */}
             {!isCreatingNew && (
               <form onSubmit={handleAssociarServico} style={{marginTop: '10px'}}>
                 <div className="form-group">
@@ -314,7 +340,6 @@ const AdminEspecialidades = () => {
               </form>
             )}
             
-            {/* --- SEÇÃO DE CADASTRAR (Toggle) --- */}
             {isCreatingNew && (
               <form onSubmit={handleCriarEAssociarServico} style={{marginTop: '10px'}}>
                 <div className="form-group">
@@ -322,13 +347,13 @@ const AdminEspecialidades = () => {
                     <input type="text" name="nome" className="form-control" value={formServico.nome} onChange={(e) => handleChange(e, setFormServico)} required />
                 </div>
                 <div className="form-group">
-                    <label className="form-label">Descrição</label>
-                    <textarea name="descricao" className="form-control" rows="3" value={formServico.descricao} onChange={(e) => handleChange(e, setFormServico)}></textarea>
+                    <label className="form-label">Descrição *</label>
+                    <textarea name="descricao" className="form-control" rows="3" value={formServico.descricao} onChange={(e) => handleChange(e, setFormServico)} required></textarea>
                 </div>
                 <div className="form-row">
                     <div className="form-group">
                         <label className="form-label">Preço (R$) *</label>
-                        <input type="number" name="preco" className="form-control" value={formServico.preco} onChange={(e) => handleChange(e, setFormServico)} required min="0" step="0.01" />
+                        <input type="number" name="preco" className="form-control" value={formServico.preco} onChange={(e) => handleChange(e, setFormServico)} required min="0.01" step="0.01" placeholder="Ex: 50.00" />
                     </div>
                     <div className="form-group">
                         <label className="form-label">Duração (min) *</label>
@@ -354,12 +379,10 @@ const AdminEspecialidades = () => {
              <button className="modal-close" onClick={fecharModais}>×</button>
            </div>
            
-           {/* Botão de Toggle */}
             <button type="button" className="btn btn-link" onClick={() => setIsCreatingNew(!isCreatingNew)}>
               {isCreatingNew ? 'Ou, selecionar um profissional existente' : 'Ou, cadastrar um novo profissional para associar'}
             </button>
             
-            {/* --- SEÇÃO DE SELECIONAR (Default) --- */}
             {!isCreatingNew && (
               <form onSubmit={handleAssociarProfissional} style={{marginTop: '10px'}}>
                 <div className="form-group">
@@ -375,10 +398,8 @@ const AdminEspecialidades = () => {
               </form>
             )}
             
-            {/* --- SEÇÃO DE CADASTRAR (Toggle) --- */}
             {isCreatingNew && (
               <form onSubmit={handleCriarEAssociarProfissional} style={{marginTop: '10px'}}>
-                {/* ... (formulário completo de profissional) ... */}
                 <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">Nome Completo *</label>
@@ -444,11 +465,9 @@ const AdminEspecialidades = () => {
                 </button>
               </form>
             )}
-
          </div>
        </div>
       )}
-
     </>
   );
 };
