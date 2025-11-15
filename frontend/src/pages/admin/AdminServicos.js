@@ -21,6 +21,33 @@ const AdminServicos = () => {
     carregarServicos();
   }, []);
 
+  // --- NOVA FUNÇÃO DE TRATAMENTO DE ERRO ---
+  const handleApiError = (error, defaultMessage) => {
+    if (error.response && error.response.status === 400) {
+      const errors = error.response.data; // { campo: 'mensagem', ... }
+      
+      // Prioriza os erros mais comuns
+      if (errors.nome) toast.error(`Nome: ${errors.nome}`);
+      else if (errors.descricao) toast.error(`Descrição: ${errors.descricao}`);
+      else if (errors.preco) toast.error(`Preço: ${errors.preco}`);
+      else if (errors.duracao_em_minutos) toast.error(`Duração: ${errors.duracao_em_minutos}`);
+      else {
+        // Fallback para o primeiro erro
+        const errorKeys = Object.keys(errors);
+        if (errorKeys.length > 0) {
+          toast.error(`${errorKeys[0]}: ${errors[errorKeys[0]]}`);
+        } else {
+          toast.error('Erro de validação. Verifique os campos.');
+        }
+      }
+    } else {
+      // Erro 500 ou outro erro de rede
+      toast.error(error.response?.data?.message || defaultMessage);
+    }
+    console.error(error);
+  };
+  // --- FIM DA FUNÇÃO ---
+
   const carregarServicos = async () => {
     try {
       setLoading(true);
@@ -40,8 +67,8 @@ const AdminServicos = () => {
         toast.success('Serviço excluído');
         carregarServicos();
       } catch (error) {
-        const msg = error.response?.data?.message || 'Erro ao excluir. Verifique o console do servidor.';
-        toast.error(msg);
+        // Erro 500 (ConstraintViolation) ou 404
+        handleApiError(error, 'Erro ao excluir serviço.');
       }
     }
   };
@@ -82,13 +109,35 @@ const AdminServicos = () => {
         duracao_em_minutos: parseInt(formData.duracao_em_minutos, 10) 
       };
 
+      // Adiciona verificação de campos obrigatórios no frontend
+      if (!dadosAtualizados.nome || dadosAtualizados.nome.trim().length === 0) {
+        toast.error("O campo Nome é obrigatório.");
+        setProcessando(false);
+        return;
+      }
+      if (!dadosAtualizados.descricao || dadosAtualizados.descricao.trim().length === 0) {
+        toast.error("O campo Descrição é obrigatório.");
+        setProcessando(false);
+        return;
+      }
+      if (isNaN(dadosAtualizados.preco) || dadosAtualizados.preco <= 0) {
+         toast.error("O Preço deve ser maior que zero.");
+         setProcessando(false);
+         return;
+      }
+       if (isNaN(dadosAtualizados.duracao_em_minutos) || dadosAtualizados.duracao_em_minutos < 1) {
+         toast.error("A Duração deve ser de no mínimo 1 minuto.");
+         setProcessando(false);
+         return;
+      }
+
       await servicoAPI.atualizar(servicoEditando.id, dadosAtualizados);
       toast.success('Serviço atualizado!');
       fecharModal();
       carregarServicos();
     } catch (error) {
-      const msg = error.response?.data?.message || 'Erro ao atualizar serviço';
-      toast.error(msg);
+      // --- CORRIGIDO: Usa a nova função de erro ---
+      handleApiError(error, 'Erro ao atualizar serviço');
     } finally {
       setProcessando(false);
     }
@@ -179,12 +228,14 @@ const AdminServicos = () => {
                 <input type="text" name="nome" className="form-control" value={formData.nome} onChange={handleChange} required />
               </div>
               <div className="form-group">
+                {/* --- CORRIGIDO: Adicionado required --- */}
                 <label className="form-label">Descrição *</label>
                 <textarea name="descricao" className="form-control" rows="3" value={formData.descricao} onChange={handleChange} required></textarea>
               </div>
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Preço (R$) *</label>
+                  {/* --- CORRIGIDO: Adicionado min="0.01" --- */}
                   <input type="number" name="preco" className="form-control" value={formData.preco} onChange={handleChange} required min="0.01" step="0.01" />
                 </div>
                 <div className="form-group">

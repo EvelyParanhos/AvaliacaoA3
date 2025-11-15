@@ -27,7 +27,7 @@ const AdminEspecialidades = () => {
   const [formServico, setFormServico] = useState({ 
     nome: '', 
     descricao: '', 
-    preco: '', // Inicia como string vazia para o placeholder funcionar
+    preco: '',
     duracao_em_minutos: 30 
   });
   
@@ -79,25 +79,34 @@ const AdminEspecialidades = () => {
     resetarForms();
   }
 
-  // --- TRATAMENTO DE ERRO GENÉRICO ---
+  // --- NOVA FUNÇÃO DE TRATAMENTO DE ERRO (ATUALIZADA) ---
   const handleApiError = (error, defaultMessage) => {
     if (error.response && error.response.status === 400) {
-      const errors = error.response.data;
-      const errorKeys = Object.keys(errors);
-      if (errorKeys.length > 0) {
-        const firstKey = errorKeys[0];
-        // Formata a mensagem de erro
-        const fieldName = firstKey.replace("duracao_em_minutos", "Duração").replace("_", " ");
-        toast.error(`${fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}: ${errors[firstKey]}`);
-      } else {
-        toast.error('Erro de validação. Verifique os campos.');
+      const errors = error.response.data; // { campo: 'mensagem', ... }
+      
+      // Prioriza os erros mais comuns
+      if (errors.nome) toast.error(`Nome: ${errors.nome}`);
+      else if (errors.descricao) toast.error(`Descrição: ${errors.descricao}`);
+      else if (errors.preco) toast.error(`Preço: ${errors.preco}`);
+      else if (errors.duracao_em_minutos) toast.error(`Duração: ${errors.duracao_em_minutos}`);
+      else if (errors.email) toast.error(`Email: ${errors.email}`);
+      else if (errors.cpf) toast.error(`CPF: ${errors.cpf}`);
+      else {
+        // Fallback para o primeiro erro
+        const errorKeys = Object.keys(errors);
+        if (errorKeys.length > 0) {
+          toast.error(`${errorKeys[0]}: ${errors[errorKeys[0]]}`);
+        } else {
+          toast.error('Erro de validação. Verifique os campos.');
+        }
       }
     } else {
-      toast.error(defaultMessage);
+      // Erro 500 ou outro erro de rede
+      toast.error(error.response?.data?.message || defaultMessage);
     }
     console.error(error);
   };
-  // --- FIM DO TRATAMENTO ---
+  // --- FIM DA FUNÇÃO ---
 
   const handleCriarEspecialidade = async (e) => {
     e.preventDefault();
@@ -148,7 +157,8 @@ const AdminEspecialidades = () => {
     setProcessando(true);
     
     const servicoDTO = {
-      ...formServico,
+      nome: formServico.nome,
+      descricao: formServico.descricao,
       preco: parseFloat(formServico.preco),
       duracao_em_minutos: parseInt(formServico.duracao_em_minutos, 10)
     };
@@ -164,6 +174,7 @@ const AdminEspecialidades = () => {
       fecharModais();
       carregarDados();
     } catch (error) { 
+      // --- CORRIGIDO: Usa a nova função de erro ---
       handleApiError(error, 'Erro ao criar e associar serviço');
     } finally { setProcessando(false); }
   };
@@ -183,6 +194,7 @@ const AdminEspecialidades = () => {
       fecharModais();
       carregarDados();
     } catch (error) { 
+       // --- CORRIGIDO: Usa a nova função de erro ---
        handleApiError(error, 'Erro ao criar e associar profissional');
     } finally { setProcessando(false); }
   };
