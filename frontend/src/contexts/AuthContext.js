@@ -1,4 +1,3 @@
-// CORRIGIDO: Adicionado 'useCallback'
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clienteAPI, profissionalAPI, administradorAPI } from '../services/api';
@@ -9,20 +8,18 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userType, setUserType] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Começa como true
   const navigate = useNavigate();
 
-  // --- CORREÇÃO 1: A função 'logout' é envolvida em useCallback ---
-  // Isto garante que a função 'logout' não é recriada em cada renderização
-  // e pode ser usada com segurança dentro do useEffect.
+  // Envolvemos o logout em useCallback para corrigir o aviso do eslint
   const logout = useCallback(() => {
     setUser(null);
     setUserType(null);
     localStorage.removeItem('user');
     localStorage.removeItem('userType');
-    localStorage.removeItem('authToken'); // Se você usar token
+    localStorage.removeItem('authToken'); 
     navigate('/login');
-  }, [navigate]); // 'navigate' é a dependência do useCallback
+  }, [navigate]); 
 
   useEffect(() => {
     // Tenta carregar dados da sessão ao iniciar
@@ -37,9 +34,9 @@ export const AuthProvider = ({ children }) => {
       console.error("Falha ao carregar dados da sessão", error);
       logout(); // Limpa se os dados estiverem corrompidos
     } finally {
-      setLoading(false);
+      setLoading(false); // Diz que o carregamento terminou
     }
-  }, [logout]); // --- CORREÇÃO 2: 'logout' é adicionada como dependência ---
+  }, [logout]); // Adiciona logout como dependência (corrigindo o aviso)
 
   const login = async (email, senha, userTypeInput) => {
     let response;
@@ -52,7 +49,7 @@ export const AuthProvider = ({ children }) => {
           response = await profissionalAPI.login({ email, senha });
           break;
         case 'administrador':
-          // A correção do login de admin que fizemos antes
+          // Esta era a correção do erro de "body missing"
           response = await administradorAPI.login({ email, senha });
           break;
         default:
@@ -66,14 +63,13 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('userType', userTypeInput);
         
-        // Redireciona para o dashboard correto
         navigate(`/${userTypeInput}/dashboard`);
         toast.success(`Login como ${userTypeInput} realizado com sucesso!`);
       }
     } catch (error) {
       console.error('Falha no login:', error);
       toast.error('Email ou senha inválidos');
-      throw error; // Propaga o erro para o componente de Login
+      throw error; 
     }
   };
 
@@ -81,10 +77,8 @@ export const AuthProvider = ({ children }) => {
   const isProfissional = () => userType === 'profissional';
   const isAdministrador = () => userType === 'administrador';
 
-  // Não renderiza nada até que a sessão seja verificada
-  if (loading) {
-    return null; 
-  }
+
+  // O 'if (loading) return null' foi REMOVIDO daqui.
 
   return (
     <AuthContext.Provider
@@ -92,6 +86,7 @@ export const AuthProvider = ({ children }) => {
         user,
         userType,
         isAuthenticated: !!user,
+        loading, // Passamos o loading para os componentes filhos
         login,
         logout,
         isCliente,
@@ -99,7 +94,11 @@ export const AuthProvider = ({ children }) => {
         isAdministrador
       }}
     >
-      {children}
+      {/* A CORREÇÃO PRINCIPAL:
+        Só renderiza a aplicação (children) QUANDO o loading for 'false'.
+        Isso impede a tela vazia.
+      */}
+      {!loading && children}
     </AuthContext.Provider>
   );
 };
