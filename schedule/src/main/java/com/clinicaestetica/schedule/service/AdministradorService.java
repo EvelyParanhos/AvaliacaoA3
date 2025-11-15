@@ -46,7 +46,7 @@ public class AdministradorService {
     private AdministradorRepository administradorRepository;
 
     @Autowired
-    private AgendamentoRepository agendamentoRepository; // JÁ ESTAVA AQUI
+    private AgendamentoRepository agendamentoRepository; 
 
     @Autowired
     private SolicitacaoRepository solicitacaoRepository;
@@ -71,21 +71,23 @@ public class AdministradorService {
         Profissional profissional = profissionalRepository.findById(id)
             .orElseThrow(() -> new NoSuchElementException("Profissional com id " + id + " não encontrado"));
         
-        // 1. CANCELAR Agendamentos futuros vinculados
-        // (findByProfissionalIdUsuario precisa existir no AgendamentoRepository)
+        // 1. Desvincular e Cancelar Agendamentos
         List<Agendamento> agendamentos = agendamentoRepository.findByProfissionalIdUsuario(id);
         for (Agendamento agendamento : agendamentos) {
+            
             // Cancela apenas o que não está Concluído ou já Cancelado
             if (agendamento.getStatus() == StatusAgendamento.AGENDADO || agendamento.getStatus() == StatusAgendamento.ALTERADO) {
                 agendamento.setStatus(StatusAgendamento.CANCELADO);
                 agendamento.setDataCancelamento(LocalDateTime.now());
             }
+            // *** A CORREÇÃO CRÍTICA ESTÁ AQUI ***
+            agendamento.setProfissional(null); 
         }
         agendamentoRepository.saveAll(agendamentos);
 
-        // 2. Desvincular de Especialidades (como pedido)
+        // 2. Desvincular de Especialidades
         profissional.getEspecialidades().clear();
-        profissionalRepository.save(profissional); // Salva para atualizar a tabela de junção
+        profissionalRepository.save(profissional); 
 
         // 3. Agora pode apagar o profissional
         profissionalRepository.delete(profissional);
@@ -93,33 +95,21 @@ public class AdministradorService {
         return profissional;
     }
 
+    // Método Editar (já existia)
+    @Transactional
     public Profissional atualizarProfissional(Long id, Profissional profissionalAtualizado) {
         Profissional profissionalExistente = profissionalRepository.findById(id)
             .orElseThrow(() -> new NoSuchElementException("Profissional com id " + id + " não encontrado"));
-        if (profissionalAtualizado.getNome() != null) {
-            profissionalExistente.setNome(profissionalAtualizado.getNome());
-        }
-        if (profissionalAtualizado.getEmail() != null) {
-            profissionalExistente.setEmail(profissionalAtualizado.getEmail());
-        }
-        if (profissionalAtualizado.getTelefone() != null) {
-            profissionalExistente.setTelefone(profissionalAtualizado.getTelefone());
-        }
-        if (profissionalAtualizado.getCep() != null) {
-            profissionalExistente.setCep(profissionalAtualizado.getCep());
-        }
-        if (profissionalAtualizado.getComplemento() != null) {
-            profissionalExistente.setComplemento(profissionalAtualizado.getComplemento());
-        }
-        if (profissionalAtualizado.getBairro() != null) {
-            profissionalExistente.setBairro(profissionalAtualizado.getBairro());
-        }
-        if (profissionalAtualizado.getCidade() != null) {
-            profissionalExistente.setCidade(profissionalAtualizado.getCidade());
-        }
-        if (profissionalAtualizado.getEstado() != null) {
-            profissionalExistente.setEstado(profissionalAtualizado.getEstado());
-        }
+
+        profissionalExistente.setNome(profissionalAtualizado.getNome());
+        profissionalExistente.setEmail(profissionalAtualizado.getEmail());
+        profissionalExistente.setTelefone(profissionalAtualizado.getTelefone());
+        profissionalExistente.setCep(profissionalAtualizado.getCep());
+        profissionalExistente.setComplemento(profissionalAtualizado.getComplemento());
+        profissionalExistente.setBairro(profissionalAtualizado.getBairro());
+        profissionalExistente.setCidade(profissionalAtualizado.getCidade());
+        profissionalExistente.setEstado(profissionalAtualizado.getEstado());
+        
         return profissionalRepository.save(profissionalExistente);
     }
 
@@ -224,7 +214,7 @@ public class AdministradorService {
                 .orElseThrow(() -> new NoSuchElementException("Profissional com id " + profissionalId + " não encontrado"));
         
         List<Agendamento> agendamentos = agendamentoRepository.findAll().stream()
-                .filter(a -> a.getProfissional().getIdUsuario().equals(profissionalId))
+                .filter(a -> a.getProfissional() != null && a.getProfissional().getIdUsuario().equals(profissionalId))
                 .collect(Collectors.toList());
         
         if (dataInicio != null && dataFim != null) {

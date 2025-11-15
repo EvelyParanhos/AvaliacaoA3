@@ -1,117 +1,81 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8080';
-
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: 'http://localhost:8080'
 });
 
-// ========== CLIENTE APIs ==========
-export const clienteAPI = {
-  listar: () => api.get('/clientes'),
-  cadastrar: (cliente) => api.post('/clientes', cliente),
-  buscarPorId: (id) => api.get(`/clientes/${id}`),
-  login: (credenciais) => api.post('/clientes/login', credenciais),
-  buscarAgendamentos: (id, filtro) => {
-    const url = filtro ? `/clientes/${id}/agendamentos?filtro=${filtro}` : `/clientes/${id}/agendamentos`;
-    return api.get(url);
-  },
-};
+// Interceptor para adicionar token, se necessário (exemplo)
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
-// ========== PROFISSIONAL APIs ==========
-export const profissionalAPI = {
-  listar: () => api.get('/profissionais'),
-  buscarPorId: (id) => api.get(`/profissionais/${id}`),
-  login: (credenciais) => api.post('/profissionais/login', credenciais),
-  buscarAgendamentos: (id) => api.get(`/profissionais/${id}/agendamentos`),
-};
-
-// ========== ADMINISTRADOR APIs ==========
-export const administradorAPI = {
-  login: (credenciais) => api.post('/administrador/login', credenciais),
-  listarSolicitacoes: () => api.get('/administrador/solicitacoes'),
-  listarProfissionais: () => api.get('/administrador/profissionais'),
-  criarProfissional: (profissional) => api.post('/administrador/profissionais', profissional),
-  atualizarProfissional: (id, profissional) => api.put(`/administrador/profissionais/${id}`, profissional),
-  deletarProfissional: (id) => api.delete(`/administrador/profissionais/${id}`),
-  processarSolicitacao: (id, novoStatus) => api.patch(`/administrador/solicitacoes/${id}/status?novoStatus=${novoStatus}`),
-  atualizarAgendamento: (id, agendamento) => api.put(`/administrador/agendamentos/${id}`, agendamento),
-  deletarAgendamento: (id) => api.delete(`/administrador/agendamentos/${id}`),
-  buscarCalendarioCompleto: (dataInicio, dataFim) => {
-    let url = '/administrador/calendario';
-    const params = [];
-    if (dataInicio) params.push(`dataInicio=${dataInicio}`);
-    if (dataFim) params.push(`dataFim=${dataFim}`);
-    if (params.length > 0) url += '?' + params.join('&');
-    return api.get(url);
-  },
-  buscarCalendarioProfissional: (profissionalId, dataInicio, dataFim) => {
-    let url = `/administrador/calendario/profissional/${profissionalId}`;
-    const params = [];
-    if (dataInicio) params.push(`dataInicio=${dataInicio}`);
-    if (dataFim) params.push(`dataFim=${dataFim}`);
-    if (params.length > 0) url += '?' + params.join('&');
-    return api.get(url);
-  },
-};
-
-// ========== SERVIÇO APIs ==========
+// API de Serviços
 export const servicoAPI = {
   listar: () => api.get('/servicos'),
-  criar: (servico) => api.post('/servicos', servico),
-  buscarPorId: (id) => api.get(`/servicos/${id}`),
-  atualizar: (id, servico) => api.put(`/servicos/${id}`, servico),
+  listarProfissionais: (idServico) => api.get(`/servicos/${idServico}/profissionais`),
+  criar: (servicoData) => api.post('/servicos', servicoData),
+  // --- FUNÇÃO DE ATUALIZAR (NOVA) ---
+  atualizar: (id, servicoData) => api.put(`/servicos/${id}`, servicoData),
   deletar: (id) => api.delete(`/servicos/${id}`),
-  listarProfissionais: (id) => api.get(`/servicos/${id}/profissionais`),
 };
 
-// ========== AGENDAMENTO APIs ==========
+// API de Clientes
+export const clienteAPI = {
+  cadastrar: (clienteData) => api.post('/clientes/cadastro', clienteData),
+  login: (credenciais) => api.post('/clientes/login', credenciais),
+  buscarAgendamentos: (idCliente, filtro) => api.get(`/clientes/${idCliente}/agendamentos`, { params: { filtro } }),
+};
+
+// API de Agendamentos (geral)
 export const agendamentoAPI = {
-  listar: () => api.get('/agendamentos'),
-  criar: (agendamento) => api.post('/agendamentos', agendamento),
-  buscarPorId: (id) => api.get(`/agendamentos/${id}`),
-  cancelar: (id) => api.delete(`/agendamentos/${id}`),
-  reagendar: (id, novaDataHora) => api.put(`/agendamentos/${id}/reagendar`, novaDataHora, {
-    headers: { 'Content-Type': 'application/json' }
-  }),
-  atualizarStatus: (id, novoStatus) => api.patch(`/agendamentos/${id}/status?novoStatus=${novoStatus}`),
-  listarHistorico: (status) => {
-    const url = status ? `/agendamentos/historico?status=${status}` : '/agendamentos/historico';
-    return api.get(url);
-  },
-  listarPassados: () => api.get('/agendamentos/passados'),
+  criar: (agendamentoData) => api.post('/agendamentos', agendamentoData),
+  cancelar: (idAgendamento) => api.post(`/agendamentos/${idAgendamento}/cancelar-cliente`),
+  reagendar: (idAgendamento, novaDataHora) => api.post(`/agendamentos/${idAgendamento}/reagendar-cliente`, { novaDataHora }),
+  listarHistorico: (status) => api.get('/agendamentos/historico', { params: { status } }),
 };
 
-// ========== AVALIAÇÃO APIs ==========
+// API de Avaliação
 export const avaliacaoAPI = {
-  criar: (agendamentoId, avaliacao) => api.post(`/avaliacoes/${agendamentoId}`, avaliacao),
+  criar: (idAgendamento, avaliacaoData) => api.post(`/avaliacoes/${idAgendamento}`, avaliacaoData),
 };
 
-// ========== SOLICITAÇÃO APIs ==========
+// API de Profissionais
+export const profissionalAPI = {
+  login: (credenciais) => api.post('/profissionais/login', credenciais),
+  buscarAgendamentos: (idProfissional) => api.get(`/profissionais/${idProfissional}/agendamentos`),
+};
+
+// API de Solicitações
 export const solicitacaoAPI = {
-  listar: () => api.get('/solicitacoes'),
-  criar: (solicitacao) => api.post('/solicitacoes', solicitacao),
-  criarReagendamento: (solicitacao) => api.post('/solicitacoes/reagendamento', solicitacao),
+  criar: (solicitacaoData) => api.post('/solicitacoes', solicitacaoData),
+  criarReagendamento: (solicitacaoData) => api.post('/solicitacoes/reagendamento', solicitacaoData),
 };
 
-// ========== ESPECIALIDADE APIs ==========
+// API de Administrador
+export const administradorAPI = {
+  login: (credenciais) => api.post('/admin/login', credenciais),
+  listarSolicitacoes: () => api.get('/admin/solicitacoes'),
+  processarSolicitacao: (idSolicitacao, status) => api.post(`/admin/solicitacoes/${idSolicitacao}/processar`, null, { params: { status } }),
+  listarProfissionais: () => api.get('/admin/profissionais'),
+  criarProfissional: (profData) => api.post('/admin/profissionais', profData),
+  // --- FUNÇÃO DE ATUALIZAR (JÁ EXISTIA) ---
+  atualizarProfissional: (id, profData) => api.put(`/admin/profissionais/${id}`, profData),
+  deletarProfissional: (id) => api.delete(`/admin/profissionais/${id}`),
+  associarServico: (idEspecialidade, idServico) => api.post(`/admin/especialidades/${idEspecialidade}/servicos/${idServico}`),
+  associarProfissional: (idEspecialidade, idProfissional) => api.post(`/admin/especialidades/${idEspecialidade}/profissionais/${idProfissional}`),
+  getCalendario: (params) => api.get('/admin/calendario/completo', { params }),
+  atualizarAgendamento: (id, agendamentoData) => api.put(`/admin/agendamentos/${id}`, agendamentoData),
+};
+
+// API de Especialidades
 export const especialidadeAPI = {
   listar: () => api.get('/especialidades'),
-  criar: (especialidade) => api.post('/especialidades', especialidade),
-  buscarPorId: (id) => api.get(`/especialidades/${id}`),
-  atualizar: (id, especialidade) => api.put(`/especialidades/${id}`, especialidade),
-  deletar: (id) => api.delete(`/especialidades/${id}`),
-  associarServico: (especialidadeId, servicoId) => 
-    api.put(`/especialidades/${especialidadeId}/servicos/${servicoId}`),
-  desassociarServico: (especialidadeId, servicoId) => 
-    api.delete(`/especialidades/${especialidadeId}/servicos/${servicoId}`),
-  associarProfissional: (especialidadeId, profissionalId) => 
-    api.put(`/especialidades/${especialidadeId}/profissionais/${profissionalId}`),
-  desassociarProfissional: (especialidadeId, profissionalId) => 
-    api.delete(`/especialidades/${especialidadeId}/profissionais/${profissionalId}`),
+  criar: (espData) => api.post('/especialidades', espData),
+  deletar: (id) => api.delete(`/especialidades/${id}`), // Adicione se precisar
 };
 
 export default api;

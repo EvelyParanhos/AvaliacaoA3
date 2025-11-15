@@ -92,7 +92,10 @@ const AdminEspecialidades = () => {
   // --- Handlers de ASSOCIAÇÃO (Selecionar existente) ---
   const handleAssociarProfissional = async (e) => {
     e.preventDefault();
-    if (!especialidadeSelecionada || !profissionalId) return;
+    if (!especialidadeSelecionada || !profissionalId) {
+      toast.error('Selecione um profissional');
+      return;
+    }
     setProcessando(true);
     try {
       await administradorAPI.associarProfissional(especialidadeSelecionada.idEspecialidade, profissionalId);
@@ -105,7 +108,10 @@ const AdminEspecialidades = () => {
 
   const handleAssociarServico = async (e) => {
     e.preventDefault();
-    if (!especialidadeSelecionada || !servicoId) return;
+    if (!especialidadeSelecionada || !servicoId) {
+       toast.error('Selecione um serviço');
+      return;
+    }
      setProcessando(true);
     try {
       await administradorAPI.associarServico(especialidadeSelecionada.idEspecialidade, servicoId);
@@ -190,10 +196,17 @@ const AdminEspecialidades = () => {
     setShowCriarEspecialidade(true);
   };
 
-  if (loading) {
-    return (
-        <Navbar />
-        // ... (código de loading) ...
+if (loading) {
+     return (
+        <>
+          <Navbar />
+          <div className="container">
+            <div className="loading-container">
+              <div className="spinner"></div>
+              <p>Carregando profissionais...</p>
+            </div>
+          </div>
+        </>
     );
   }
 

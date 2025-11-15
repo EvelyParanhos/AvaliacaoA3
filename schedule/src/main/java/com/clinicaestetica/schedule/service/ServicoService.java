@@ -47,25 +47,27 @@ public class ServicoService {
                 .orElseThrow(() -> new NoSuchElementException("Serviço com ID " + id + " não encontrado"));
     }
 
-    // --- MÉTODO DELETAR CORRIGIDO ---
     @Transactional
     public void deletarServico(Long id) {
         Servico servico = servicoRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Serviço com ID " + id + " não encontrado para exclusão"));
 
-        // 1. CANCELAR Agendamentos futuros vinculados
-        // (findByServicoId precisa existir no AgendamentoRepository)
+        // 1. Desvincular e Cancelar Agendamentos
         List<Agendamento> agendamentos = agendamentoRepository.findByServicoId(id);
         for (Agendamento agendamento : agendamentos) {
+            
             // Cancela apenas o que não está Concluído ou já Cancelado
             if (agendamento.getStatus() == StatusAgendamento.AGENDADO || agendamento.getStatus() == StatusAgendamento.ALTERADO) {
                 agendamento.setStatus(StatusAgendamento.CANCELADO);
                 agendamento.setDataCancelamento(LocalDateTime.now());
             }
+            // *** A CORREÇÃO CRÍTICA ESTÁ AQUI ***
+            // Quebra o elo entre o agendamento e o serviço que será excluído
+            agendamento.setServico(null); 
         }
         agendamentoRepository.saveAll(agendamentos);
 
-        // 2. Desvincular de Especialidades (como pedido)
+        // 2. Desvincular de Especialidades
         for (Especialidade especialidade : servico.getEspecialidades()) {
             especialidade.getServicos().remove(servico);
         }
@@ -73,5 +75,19 @@ public class ServicoService {
         
         // 3. Agora podemos deletar o serviço
         servicoRepository.delete(servico);
+    }
+
+    // --- MÉTODO EDITAR (NOVO) ---
+    @Transactional
+    public Servico atualizarServico(Long id, Servico servicoAtualizado) {
+        Servico servicoExistente = servicoRepository.findById(id)
+            .orElseThrow(() -> new NoSuchElementException("Serviço com ID " + id + " não encontrado"));
+
+        servicoExistente.setNome(servicoAtualizado.getNome());
+        servicoExistente.setDescricao(servicoAtualizado.getDescricao());
+        servicoExistente.setPreco(servicoAtualizado.getPreco());
+        servicoExistente.setDuracaoEmMinutos(servicoAtualizado.getDuracaoEmMinutos());
+        
+        return servicoRepository.save(servicoExistente);
     }
 }

@@ -7,7 +7,11 @@ const AdminServicos = () => {
   const [servicos, setServicos] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // A LÓGICA DE MODAL E FORM DE CRIAÇÃO FOI REMOVIDA DAQUI
+  // --- Estados para Edição (NOVOS) ---
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [servicoEmEdicao, setServicoEmEdicao] = useState(null);
+  const [processando, setProcessando] = useState(false);
+  // --- Fim dos estados de edição ---
 
   useEffect(() => {
     carregarServicos();
@@ -24,9 +28,13 @@ const AdminServicos = () => {
       setLoading(false);
     }
   };
+  
+  const handleChangeEdit = (e) => {
+    const { name, value } = e.target;
+    setServicoEmEdicao(prev => ({ ...prev, [name]: value }));
+  };
 
   const deletar = async (id) => {
-    // Mensagem de confirmação atualizada com a nova regra
     if (window.confirm('Confirma exclusão? Este serviço será removido de especialidades e agendamentos futuros serão CANCELADOS.')) {
       try {
         await servicoAPI.deletar(id);
@@ -39,17 +47,36 @@ const AdminServicos = () => {
     }
   };
   
+  // --- Funções de Edição (NOVAS) ---
   const handleEditar = (servico) => {
-    // Lógica de edição (abrir modal de edição)
-    // Por enquanto, apenas um placeholder:
-    toast.info(`Funcionalidade "Editar Serviço ${servico.nome}" ainda não implementada.`);
+    setServicoEmEdicao(servico);
+    setShowEditModal(true);
   };
+  
+  const handleUpdateServico = async (e) => {
+    e.preventDefault();
+    if (!servicoEmEdicao) return;
+    
+    setProcessando(true);
+    try {
+      await servicoAPI.atualizar(servicoEmEdicao.id, servicoEmEdicao);
+      toast.success('Serviço atualizado com sucesso!');
+      setShowEditModal(false);
+      setServicoEmEdicao(null);
+      carregarServicos();
+    } catch (error) {
+      toast.error('Erro ao atualizar serviço');
+      console.error(error);
+    } finally {
+      setProcessando(false);
+    }
+  };
+  // --- Fim das funções de edição ---
 
   const formatarMoeda = (valor) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
   };
 
-  // --- CÓDIGO DE LOADING CORRIGIDO ---
   if (loading) {
     return (
         <>
@@ -63,14 +90,12 @@ const AdminServicos = () => {
         </>
     );
   }
-  // --- FIM DA CORREÇÃO ---
 
   return (
     <>
       <Navbar />
       <div className="container fade-in">
         
-        {/* --- CABEÇALHO SIMPLIFICADO --- */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
           <h1 style={{ color: 'var(--primary-color)', margin: 0 }}>
             Gerenciar Serviços
@@ -119,6 +144,47 @@ const AdminServicos = () => {
           </div>
         )}
       </div>
+
+      {/* --- MODAL DE EDIÇÃO (NOVO) --- */}
+      {showEditModal && servicoEmEdicao && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Editar Serviço</h2>
+              <button className="modal-close" onClick={() => setShowEditModal(false)}>×</button>
+            </div>
+            <form onSubmit={handleUpdateServico}>
+                <div className="form-group">
+                    <label className="form-label">Nome do Serviço *</label>
+                    <input type="text" name="nome" className="form-control" value={servicoEmEdicao.nome} onChange={handleChangeEdit} required />
+                </div>
+                <div className="form-group">
+                    <label className="form-label">Descrição</label>
+                    <textarea name="descricao" className="form-control" rows="3" value={servicoEmEdicao.descricao} onChange={handleChangeEdit}></textarea>
+                </div>
+                <div className="form-row">
+                    <div className="form-group">
+                        <label className="form-label">Preço (R$) *</label>
+                        <input type="number" name="preco" className="form-control" value={servicoEmEdicao.preco} onChange={handleChangeEdit} required min="0" step="0.01" />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Duração (min) *</label>
+                        <input type="number" name="duracao_em_minutos" className="form-control" value={servicoEmEdicao.duracaoEmMinutos} onChange={handleChangeEdit} required min="1" />
+                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                    <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowEditModal(false)}>
+                      Cancelar
+                    </button>
+                    <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={processando}>
+                      {processando ? 'Salvando...' : 'Salvar Alterações'}
+                    </button>
+                </div>
+            </form>
+          </div>
+        </div>
+      )}
+      
     </>
   );
 };
