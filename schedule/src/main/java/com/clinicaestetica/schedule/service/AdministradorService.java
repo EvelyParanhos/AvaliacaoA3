@@ -28,7 +28,7 @@ import com.clinicaestetica.schedule.model.Administrador;
 import com.clinicaestetica.schedule.enums.StatusSolicitacao;
 import com.clinicaestetica.schedule.enums.TipoSolicitacaoAgendamento;
 import com.clinicaestetica.schedule.enums.StatusAgendamento;
-import org.springframework.transaction.annotation.Transactional; // Importe isto
+import org.springframework.transaction.annotation.Transactional; 
 
 @Service
 public class AdministradorService {
@@ -46,7 +46,7 @@ public class AdministradorService {
     private AdministradorRepository administradorRepository;
 
     @Autowired
-    private AgendamentoRepository agendamentoRepository;
+    private AgendamentoRepository agendamentoRepository; // JÁ ESTAVA AQUI
 
     @Autowired
     private SolicitacaoRepository solicitacaoRepository;
@@ -65,27 +65,38 @@ public class AdministradorService {
         return Optional.empty();
     }
     
-    // CORRIGIDO: Agora transacional e remove associações
+    // --- MÉTODO DELETAR CORRIGIDO ---
     @Transactional
     public Profissional deletarProfissional(Long id){ 
         Profissional profissional = profissionalRepository.findById(id)
             .orElseThrow(() -> new NoSuchElementException("Profissional com id " + id + " não encontrado"));
+        
+        // 1. CANCELAR Agendamentos futuros vinculados
+        // (Adicione o método findByProfissionalIdUsuario ao AgendamentoRepository - veja próximo ficheiro)
+        List<Agendamento> agendamentos = agendamentoRepository.findByProfissionalIdUsuario(id);
+        for (Agendamento agendamento : agendamentos) {
+            // Cancela apenas o que não está Concluído ou já Cancelado
+            if (agendamento.getStatus() == StatusAgendamento.AGENDADO || agendamento.getStatus() == StatusAgendamento.ALTERADO) {
+                agendamento.setStatus(StatusAgendamento.CANCELADO);
+                agendamento.setDataCancelamento(LocalDateTime.now());
+            }
+        }
+        agendamentoRepository.saveAll(agendamentos);
 
-        // Limpa as associações com especialidades (lado proprietário da relação)
+        // 2. Desvincular de Especialidades (como pedido)
         profissional.getEspecialidades().clear();
-        profissionalRepository.save(profissional); // Salva a entidade para atualizar a tabela de junção
+        profissionalRepository.save(profissional); // Salva para atualizar a tabela de junção
 
-        // Agora pode apagar o profissional
+        // 3. Agora pode apagar o profissional
         profissionalRepository.delete(profissional);
 
         return profissional;
     }
 
     public Profissional atualizarProfissional(Long id, Profissional profissionalAtualizado) {
+        // ... (código existente, sem alteração) ...
         Profissional profissionalExistente = profissionalRepository.findById(id)
             .orElseThrow(() -> new NoSuchElementException("Profissional com id " + id + " não encontrado"));
-
-        // Atualizar informações pessoais editáveis
         if (profissionalAtualizado.getNome() != null) {
             profissionalExistente.setNome(profissionalAtualizado.getNome());
         }
@@ -95,8 +106,6 @@ public class AdministradorService {
         if (profissionalAtualizado.getTelefone() != null) {
             profissionalExistente.setTelefone(profissionalAtualizado.getTelefone());
         }
-
-        // Atualizar endereço completo
         if (profissionalAtualizado.getCep() != null) {
             profissionalExistente.setCep(profissionalAtualizado.getCep());
         }
@@ -112,70 +121,60 @@ public class AdministradorService {
         if (profissionalAtualizado.getEstado() != null) {
             profissionalExistente.setEstado(profissionalAtualizado.getEstado());
         }
-
         return profissionalRepository.save(profissionalExistente);
     }
 
-    public Agendamento deletarAgendamento(Long id){ // com as solicitações dos profissionais
+    public Agendamento deletarAgendamento(Long id){ 
+        // ... (código existente, sem alteração) ...
         Agendamento agendamento = agendamentoRepository.findById(id)
             .orElseThrow(() -> new NoSuchElementException("Agendamento com id " + id + " não encontrado"));
         agendamentoRepository.deleteById(id);
-
         return agendamento;
     }
 
     public List<Solicitacao> listarSolicitacoes(){
+        // ... (código existente, sem alteração) ...
         return solicitacaoRepository.findAll();
     }
 
     public List<Profissional> listarProfissionais() {
+        // ... (código existente, sem alteração) ...
         return profissionalRepository.findAll();
     }
 
     public Solicitacao processarSolicitacao(Long id, StatusSolicitacao novoStatus) {
+        // ... (código existente, sem alteração) ...
         Solicitacao solicitacao = solicitacaoRepository.findById(id)
             .orElseThrow(() -> new NoSuchElementException("Solicitação com ID " + id + " não encontrada"));
-
-        // Regra de Negócio: O Admin só pode aprovar ou recusar
         if (novoStatus == StatusSolicitacao.PENDENTE) {
             throw new IllegalArgumentException("Não é possível alterar o status de uma solicitação para PENDENTE.");
         }
-
-        // Regra de Negócio: Não pode processar uma solicitação que já foi processada
         if (solicitacao.getStatus() != StatusSolicitacao.PENDENTE) {
             throw new IllegalArgumentException("A solicitação já foi processada (Status: " + solicitacao.getStatus() + ").");
         }
-        
         solicitacao.setStatus(novoStatus);
-
-        // Se APROVADA, atualiza o Agendamento
         if (novoStatus == StatusSolicitacao.APROVADA) {
             Agendamento agendamento = solicitacao.getAgendamento();
-            
             if (agendamento == null) {
                 throw new IllegalStateException("Agendamento associado à solicitação é nulo.");
             }
-
             if (solicitacao.getTipo() == TipoSolicitacaoAgendamento.CANCELAR) {
                 agendamento.setStatus(StatusAgendamento.CANCELADO);
                 agendamento.setDataCancelamento(LocalDateTime.now());
                 agendamentoRepository.save(agendamento);
             } else if (solicitacao.getTipo() == TipoSolicitacaoAgendamento.ALTERAR) {
-                // A aprovação de ALTERAR apenas marca o agendamento como alterado para que o Admin ppossa posteriormente reagendar ou tomar a próxima ação.
                 agendamento.setStatus(StatusAgendamento.ALTERADO);
                 agendamentoRepository.save(agendamento);
             }
         }
-
         return solicitacaoRepository.save(solicitacao);
     }
 
     public Agendamento atualizarAgendamentoDireto(Long id, Agendamento agendamentoAtualizado) {
+        // ... (código existente, sem alteração) ...
         Agendamento agendamentoExistente = agendamentoRepository.findById(id)
             .orElseThrow(() -> new NoSuchElementException("Agendamento com id " + id + " não encontrado para edição."));
-
         if (agendamentoAtualizado.getDataHora() != null) {
-            // Verificar conflito de horário
             boolean conflito = agendamentoRepository.existsByProfissionalIdUsuarioAndDataHoraAndStatusNot(
                 agendamentoExistente.getProfissional().getIdUsuario(),
                 agendamentoAtualizado.getDataHora(),
@@ -186,33 +185,25 @@ public class AdministradorService {
             }
             agendamentoExistente.setDataHora(agendamentoAtualizado.getDataHora());
         }
-        
-
-        // 2. Atualiza Status
         if (agendamentoAtualizado.getStatus() != null) {
             agendamentoExistente.setStatus(agendamentoAtualizado.getStatus());
         }
-        
-        // 3. Atualiza Profissional (se um novo ID for fornecido)
         if (agendamentoAtualizado.getProfissional() != null && agendamentoAtualizado.getProfissional().getIdUsuario() != null) {
             Profissional novoProfissional = profissionalRepository.findById(agendamentoAtualizado.getProfissional().getIdUsuario())
                 .orElseThrow(() -> new NoSuchElementException("Profissional com ID " + agendamentoAtualizado.getProfissional().getIdUsuario() + " não encontrado para edição de agendamento."));
             agendamentoExistente.setProfissional(novoProfissional);
         }
-        
-        // 4. Atualiza Serviço (se um novo ID for fornecido)
         if (agendamentoAtualizado.getServico() != null && agendamentoAtualizado.getServico().getId() != null) {
             Servico novoServico = servicoRepository.findById(agendamentoAtualizado.getServico().getId())
                 .orElseThrow(() -> new NoSuchElementException("Serviço com ID " + agendamentoAtualizado.getServico().getId() + " não encontrado para edição de agendamento."));
             agendamentoExistente.setServico(novoServico);
         }
-
         return agendamentoRepository.save(agendamentoExistente);
     }
 
     public Map<String, List<Agendamento>> getCalendarioCompleto(LocalDate dataInicio, LocalDate dataFim) {
+        // ... (código existente, sem alteração) ...
         List<Agendamento> todosAgendamentos;
-        
         if (dataInicio != null && dataFim != null) {
             LocalDateTime inicio = dataInicio.atStartOfDay();
             LocalDateTime fim = dataFim.atTime(LocalTime.MAX);
@@ -222,29 +213,26 @@ public class AdministradorService {
         } else {
             todosAgendamentos = agendamentoRepository.findAll();
         }
-        
-        // Agrupar por profissional
         Map<String, List<Agendamento>> calendarioPorProfissional = new HashMap<>();
-        
         for (Agendamento agendamento : todosAgendamentos) {
-            String nomeProfissional = agendamento.getProfissional().getNome();
+            String nomeProfissional = "Sem Profissional";
+            if (agendamento.getProfissional() != null) {
+                 nomeProfissional = agendamento.getProfissional().getNome();
+            }
             calendarioPorProfissional
                     .computeIfAbsent(nomeProfissional, k -> new java.util.ArrayList<>())
                     .add(agendamento);
         }
-        
         return calendarioPorProfissional;
     }
 
-    // Calendário de um profissional específico
     public List<Agendamento> getCalendarioProfissional(Long profissionalId, LocalDate dataInicio, LocalDate dataFim) {
+        // ... (código existente, sem alteração) ...
         Profissional profissional = profissionalRepository.findById(profissionalId)
                 .orElseThrow(() -> new NoSuchElementException("Profissional com id " + profissionalId + " não encontrado"));
-        
         List<Agendamento> agendamentos = agendamentoRepository.findAll().stream()
                 .filter(a -> a.getProfissional().getIdUsuario().equals(profissionalId))
                 .collect(Collectors.toList());
-        
         if (dataInicio != null && dataFim != null) {
             LocalDateTime inicio = dataInicio.atStartOfDay();
             LocalDateTime fim = dataFim.atTime(LocalTime.MAX);
@@ -252,30 +240,26 @@ public class AdministradorService {
                     .filter(a -> !a.getDataHora().isBefore(inicio) && !a.getDataHora().isAfter(fim))
                     .collect(Collectors.toList());
         }
-        
         return agendamentos;
     }
 
     public Especialidade associarServico(Long especialidadeId, Long servicoId) {
+        // ... (código existente, sem alteração) ...
         Especialidade especialidade = especialidadeRepository.findById(especialidadeId)
             .orElseThrow(() -> new NoSuchElementException("Especialidade não encontrada"));
-        
         Servico servico = servicoRepository.findById(servicoId)
             .orElseThrow(() -> new NoSuchElementException("Serviço não encontrado"));
-
-        especialidade.getServicos().add(servico); //
+        especialidade.getServicos().add(servico);
         return especialidadeRepository.save(especialidade);
     }
 
     public Profissional associarProfissional(Long especialidadeId, Long profissionalId) {
+        // ... (código existente, sem alteração) ...
         Especialidade especialidade = especialidadeRepository.findById(especialidadeId)
             .orElseThrow(() -> new NoSuchElementException("Especialidade não encontrada"));
-        
         Profissional profissional = profissionalRepository.findById(profissionalId)
             .orElseThrow(() -> new NoSuchElementException("Profissional não encontrado"));
-
         profissional.getEspecialidades().add(especialidade);
         return profissionalRepository.save(profissional);
     }
-
 }

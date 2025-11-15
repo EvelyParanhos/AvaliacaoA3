@@ -43,10 +43,13 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
     // Buscar agendamentos por status
     List<Agendamento> findByStatus(StatusAgendamento status);
 
-    // Buscar agendamentos por profissional
-    @Query("SELECT a FROM Agendamento a WHERE a.profissional.idUsuario = :profissionalId ORDER BY a.dataHora ASC")
-    List<Agendamento> findByProfissionalIdUsuario(@Param("profissionalId") Long profissionalId);
-
     // Buscar agendamentos por profissional e status
     List<Agendamento> findByProfissionalIdUsuarioAndStatus(Long profissionalId, StatusAgendamento status);
+
+    // Encontra todos os agendamentos de um serviço
+    List<Agendamento> findByServicoId(Long servicoId);
+
+    // Encontra todos os agendamentos de um profissional
+    List<Agendamento> findByProfissionalIdUsuario(Long profissionalId);
+    
 }
