@@ -31,7 +31,23 @@ const ClienteAgendamentos = () => {
     try {
       setLoading(true);
       const response = await clienteAPI.buscarAgendamentos(user.idUsuario, filtro);
-      setAgendamentos(response.data);
+      
+      // CORREÇÃO: Filtrar corretamente baseado no filtro selecionado
+      let agendamentosFiltrados = response.data;
+      
+      if (filtro === 'futuros') {
+        agendamentosFiltrados = response.data.filter(ag => 
+          (ag.status === 'AGENDADO' || ag.status === 'ALTERADO') &&
+          new Date(ag.dataHora) > new Date()
+        );
+      } else if (filtro === 'passados') {
+        agendamentosFiltrados = response.data.filter(ag => 
+          ag.status === 'CONCLUÍDO' || ag.status === 'CANCELADO' ||
+          new Date(ag.dataHora) <= new Date()
+        );
+      }
+      
+      setAgendamentos(agendamentosFiltrados);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
       toast.error('Erro ao carregar agendamentos');
@@ -41,6 +57,7 @@ const ClienteAgendamentos = () => {
   };
 
   const formatarData = (dataHora) => {
+    if (!dataHora) return 'Data inválida';
     const data = new Date(dataHora);
     return data.toLocaleString('pt-BR', {
       day: '2-digit',
@@ -52,6 +69,7 @@ const ClienteAgendamentos = () => {
   };
 
   const formatarMoeda = (valor) => {
+    if (!valor) return 'R$ 0,00';
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
@@ -69,6 +87,7 @@ const ClienteAgendamentos = () => {
   };
 
   const podeCancelar = (agendamento) => {
+    if (!agendamento || !agendamento.dataHora) return false;
     const dataAgendamento = new Date(agendamento.dataHora);
     const agora = new Date();
     const diferencaHoras = (dataAgendamento - agora) / (1000 * 60 * 60);
@@ -77,6 +96,7 @@ const ClienteAgendamentos = () => {
   };
 
   const podeReagendar = (agendamento) => {
+    if (!agendamento || !agendamento.dataHora) return false;
     const dataAgendamento = new Date(agendamento.dataHora);
     const agora = new Date();
     const diferencaHoras = (dataAgendamento - agora) / (1000 * 60 * 60);
@@ -85,7 +105,7 @@ const ClienteAgendamentos = () => {
   };
 
   const podeAvaliar = (agendamento) => {
-    return agendamento.status === 'CONCLUÍDO' && !agendamento.avaliacao;
+    return agendamento && agendamento.status === 'CONCLUÍDO' && !agendamento.avaliacao;
   };
 
   const abrirModalCancelar = (agendamento) => {
@@ -98,20 +118,24 @@ const ClienteAgendamentos = () => {
   };
 
   const handleCancelar = async () => {
+    if (!agendamentoSelecionado?.idAgendamento) {
+      toast.error('Agendamento inválido');
+      return;
+    }
+
     setProcessando(true);
     try {
       const response = await agendamentoAPI.cancelar(agendamentoSelecionado.idAgendamento);
-      if (response.status === 204) {
+      if (response.status === 204 || response.status === 200) {
         toast.success('Agendamento cancelado com sucesso!');
         setShowModalCancelar(false);
         carregarAgendamentos();
       }
     } catch (error) {
-      if (error.response?.data?.message) {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error('Erro ao cancelar agendamento');
-      }
+      const mensagem = error.response?.data?.message || 
+                      error.response?.data || 
+                      'Erro ao cancelar agendamento';
+      toast.error(mensagem);
       console.error('Erro ao cancelar:', error);
     } finally {
       setProcessando(false);
@@ -131,6 +155,16 @@ const ClienteAgendamentos = () => {
 
   const handleReagendar = async (e) => {
     e.preventDefault();
+    
+    if (!agendamentoSelecionado?.idAgendamento) {
+      toast.error('Agendamento inválido');
+      return;
+    }
+
+    if (!novaDataHora) {
+      toast.error('Selecione uma nova data e hora');
+      return;
+    }
     
     // Validar horário de funcionamento
     const dataHoraSelecionada = new Date(novaDataHora);
@@ -163,11 +197,10 @@ const ClienteAgendamentos = () => {
         carregarAgendamentos();
       }
     } catch (error) {
-      if (error.response?.data?.message) {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error('Erro ao solicitar reagendamento');
-      }
+      const mensagem = error.response?.data?.message || 
+                      error.response?.data || 
+                      'Erro ao solicitar reagendamento';
+      toast.error(mensagem);
       console.error('Erro ao reagendar:', error);
     } finally {
       setProcessando(false);
@@ -186,6 +219,17 @@ const ClienteAgendamentos = () => {
 
   const handleAvaliar = async (e) => {
     e.preventDefault();
+    
+    if (!agendamentoSelecionado?.idAgendamento) {
+      toast.error('Agendamento inválido');
+      return;
+    }
+
+    if (!avaliacao.comentario || avaliacao.comentario.trim().length === 0) {
+      toast.error('Por favor, escreva um comentário sobre o atendimento');
+      return;
+    }
+
     setProcessando(true);
     try {
       const response = await avaliacaoAPI.criar(agendamentoSelecionado.idAgendamento, avaliacao);
@@ -196,11 +240,10 @@ const ClienteAgendamentos = () => {
         carregarAgendamentos();
       }
     } catch (error) {
-      if (error.response?.data?.message) {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error('Erro ao enviar avaliação');
-      }
+      const mensagem = error.response?.data?.message || 
+                      error.response?.data || 
+                      'Erro ao enviar avaliação';
+      toast.error(mensagem);
       console.error('Erro ao avaliar:', error);
     } finally {
       setProcessando(false);
@@ -266,7 +309,7 @@ const ClienteAgendamentos = () => {
                 <div key={agendamento.idAgendamento} className="card">
                   <div className="card-header">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>{agendamento.servico?.nome}</span>
+                      <span>{agendamento.servico?.nome || 'Serviço não informado'}</span>
                       <span className={`badge ${getStatusBadge(agendamento.status)}`}>
                         {agendamento.status}
                       </span>
@@ -274,7 +317,7 @@ const ClienteAgendamentos = () => {
                   </div>
                   <div className="card-body">
                     <p><strong>📅 Data:</strong> {formatarData(agendamento.dataHora)}</p>
-                    <p><strong>👤 Profissional:</strong> {agendamento.profissional?.nome}</p>
+                    <p><strong>👤 Profissional:</strong> {agendamento.profissional?.nome || 'Não informado'}</p>
                     <p><strong>💰 Valor:</strong> {formatarMoeda(agendamento.servico?.preco)}</p>
                     {agendamento.pagamentoParcial && (
                       <p style={{ fontSize: '0.9rem', color: 'var(--warning)' }}>
@@ -330,7 +373,7 @@ const ClienteAgendamentos = () => {
       </div>
 
       {/* Modal Cancelar */}
-      {showModalCancelar && (
+      {showModalCancelar && agendamentoSelecionado && (
         <div className="modal-overlay" onClick={() => setShowModalCancelar(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -338,8 +381,8 @@ const ClienteAgendamentos = () => {
               <button className="modal-close" onClick={() => setShowModalCancelar(false)}>×</button>
             </div>
             <p>Tem certeza que deseja cancelar este agendamento?</p>
-            <p><strong>{agendamentoSelecionado?.servico?.nome}</strong></p>
-            <p>{formatarData(agendamentoSelecionado?.dataHora)}</p>
+            <p><strong>{agendamentoSelecionado.servico?.nome}</strong></p>
+            <p>{formatarData(agendamentoSelecionado.dataHora)}</p>
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button
                 className="btn btn-secondary"
@@ -363,7 +406,7 @@ const ClienteAgendamentos = () => {
       )}
 
       {/* Modal Reagendar */}
-      {showModalReagendar && (
+      {showModalReagendar && agendamentoSelecionado && (
         <div className="modal-overlay" onClick={() => setShowModalReagendar(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -381,6 +424,9 @@ const ClienteAgendamentos = () => {
                   required
                   min={new Date().toISOString().slice(0, 16)}
                 />
+                <small style={{ color: 'var(--text-light)', fontSize: '0.85rem' }}>
+                  Horário de funcionamento: 8h às 18h
+                </small>
               </div>
               <div className="form-group">
                 <label className="form-label">Motivo (opcional)</label>
@@ -390,6 +436,7 @@ const ClienteAgendamentos = () => {
                   onChange={(e) => setDescricaoReagendamento(e.target.value)}
                   rows="3"
                   maxLength="500"
+                  placeholder="Descreva o motivo do reagendamento (opcional)"
                 />
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
@@ -417,7 +464,7 @@ const ClienteAgendamentos = () => {
       )}
 
       {/* Modal Avaliar */}
-      {showModalAvaliar && (
+      {showModalAvaliar && agendamentoSelecionado && (
         <div className="modal-overlay" onClick={() => setShowModalAvaliar(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -427,20 +474,24 @@ const ClienteAgendamentos = () => {
             <form onSubmit={handleAvaliar}>
               <div className="form-group">
                 <label className="form-label">Nota (1 a 5) *</label>
-                <div style={{ display: 'flex', gap: '10px', fontSize: '2rem' }}>
+                <div style={{ display: 'flex', gap: '10px', fontSize: '2rem', justifyContent: 'center' }}>
                   {[1, 2, 3, 4, 5].map((nota) => (
                     <span
                       key={nota}
                       onClick={() => setAvaliacao({ ...avaliacao, nota })}
                       style={{
                         cursor: 'pointer',
-                        color: nota <= avaliacao.nota ? 'gold' : 'lightgray'
+                        color: nota <= avaliacao.nota ? 'gold' : 'lightgray',
+                        transition: 'all 0.2s'
                       }}
                     >
                       ⭐
                     </span>
                   ))}
                 </div>
+                <p style={{ textAlign: 'center', marginTop: '10px', color: 'var(--primary-color)' }}>
+                  {avaliacao.nota} {avaliacao.nota === 1 ? 'estrela' : 'estrelas'}
+                </p>
               </div>
               <div className="form-group">
                 <label className="form-label">Comentário *</label>
@@ -451,7 +502,11 @@ const ClienteAgendamentos = () => {
                   rows="4"
                   required
                   maxLength="500"
+                  placeholder="Conte-nos sobre sua experiência..."
                 />
+                <small style={{ color: 'var(--text-light)', fontSize: '0.85rem' }}>
+                  {avaliacao.comentario.length}/500 caracteres
+                </small>
               </div>
               <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
                 <button

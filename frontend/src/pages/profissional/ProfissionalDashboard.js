@@ -17,11 +17,20 @@ const ProfissionalDashboard = () => {
     try {
       setLoading(true);
       const response = await profissionalAPI.buscarAgendamentos(user.idUsuario);
-      // Filtrar apenas agendamentos futuros e ordenar
+      
+      // CORREÇÃO CRÍTICA: Filtrar apenas agendamentos do profissional logado
       const agendamentosFuturos = Array.from(response.data)
-        .filter(a => new Date(a.dataHora) > new Date() && a.status === 'AGENDADO')
+        .filter(a => {
+          // Verificar se o profissional do agendamento é o usuário logado
+          const isProfissionalCorreto = a.profissional?.idUsuario === user.idUsuario;
+          const isFuturo = new Date(a.dataHora) > new Date();
+          const isStatusValido = a.status === 'AGENDADO' || a.status === 'ALTERADO';
+          
+          return isProfissionalCorreto && isFuturo && isStatusValido;
+        })
         .sort((a, b) => new Date(a.dataHora) - new Date(b.dataHora))
         .slice(0, 10);
+        
       setAgendamentos(agendamentosFuturos);
     } catch (error) {
       console.error('Erro ao carregar agendamentos:', error);
@@ -32,6 +41,7 @@ const ProfissionalDashboard = () => {
   };
 
   const formatarData = (dataHora) => {
+    if (!dataHora) return 'Data inválida';
     return new Date(dataHora).toLocaleString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
@@ -39,6 +49,16 @@ const ProfissionalDashboard = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const getStatusBadge = (status) => {
+    const badges = {
+      'AGENDADO': 'badge-info',
+      'CONCLUÍDO': 'badge-success',
+      'CANCELADO': 'badge-error',
+      'ALTERADO': 'badge-warning'
+    };
+    return badges[status] || 'badge-info';
   };
 
   if (loading) {
@@ -59,9 +79,12 @@ const ProfissionalDashboard = () => {
     <>
       <Navbar />
       <div className="container fade-in">
-        <h1 style={{ color: 'var(--primary-color)', marginBottom: '30px' }}>
+        <h1 style={{ color: 'var(--primary-color)', marginBottom: '10px' }}>
           Olá, {user.nome}! 👋
         </h1>
+        <p style={{ color: 'var(--text-light)', marginBottom: '30px' }}>
+          Aqui está sua agenda de atendimentos
+        </p>
 
         <div className="card">
           <div className="card-header">📅 Próximos Atendimentos</div>
@@ -81,9 +104,13 @@ const ProfissionalDashboard = () => {
                     {agendamentos.map(ag => (
                       <tr key={ag.idAgendamento}>
                         <td>{formatarData(ag.dataHora)}</td>
-                        <td>{ag.cliente?.nome}</td>
-                        <td>{ag.servico?.nome}</td>
-                        <td><span className="badge badge-info">{ag.status}</span></td>
+                        <td>{ag.cliente?.nome || 'Cliente não informado'}</td>
+                        <td>{ag.servico?.nome || 'Serviço não informado'}</td>
+                        <td>
+                          <span className={`badge ${getStatusBadge(ag.status)}`}>
+                            {ag.status}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -91,9 +118,33 @@ const ProfissionalDashboard = () => {
               </div>
             ) : (
               <div className="empty-state">
+                <div className="empty-state-icon">📅</div>
                 <p>Nenhum atendimento agendado</p>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Card de Resumo */}
+        <div className="grid grid-2" style={{ marginTop: '20px' }}>
+          <div className="card">
+            <div className="card-header">📊 Resumo</div>
+            <div className="card-body">
+              <p><strong>Total de atendimentos futuros:</strong> {agendamentos.length}</p>
+              <p><strong>Profissional:</strong> {user.nome}</p>
+              {user.registroProfissional && (
+                <p><strong>Registro:</strong> {user.registroProfissional}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">💡 Dicas</div>
+            <div className="card-body">
+              <p>✓ Verifique sua agenda regularmente</p>
+              <p>✓ Caso precise alterar um atendimento, use a aba "Solicitações"</p>
+              <p>✓ Entre em contato com os clientes se necessário</p>
+            </div>
           </div>
         </div>
       </div>

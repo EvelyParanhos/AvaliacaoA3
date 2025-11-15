@@ -23,6 +23,7 @@ export const clienteAPI = {
 
 // ========== PROFISSIONAL APIs ==========
 export const profissionalAPI = {
+  listar: () => api.get('/profissionais'),
   buscarPorId: (id) => api.get(`/profissionais/${id}`),
   login: (credenciais) => api.post('/profissionais/login', credenciais),
   buscarAgendamentos: (id) => api.get(`/profissionais/${id}/agendamentos`),
@@ -62,7 +63,9 @@ export const servicoAPI = {
   listar: () => api.get('/servicos'),
   criar: (servico) => api.post('/servicos', servico),
   buscarPorId: (id) => api.get(`/servicos/${id}`),
+  atualizar: (id, servico) => api.put(`/servicos/${id}`, servico),
   deletar: (id) => api.delete(`/servicos/${id}`),
+  listarProfissionais: (id) => api.get(`/servicos/${id}/profissionais`),
 };
 
 // ========== AGENDAMENTO APIs ==========
@@ -92,6 +95,23 @@ export const solicitacaoAPI = {
   listar: () => api.get('/solicitacoes'),
   criar: (solicitacao) => api.post('/solicitacoes', solicitacao),
   criarReagendamento: (solicitacao) => api.post('/solicitacoes/reagendamento', solicitacao),
+};
+
+// ========== ESPECIALIDADE APIs ==========
+export const especialidadeAPI = {
+  listar: () => api.get('/especialidades'),
+  criar: (especialidade) => api.post('/especialidades', especialidade),
+  buscarPorId: (id) => api.get(`/especialidades/${id}`),
+  atualizar: (id, especialidade) => api.put(`/especialidades/${id}`, especialidade),
+  deletar: (id) => api.delete(`/especialidades/${id}`),
+  associarServico: (especialidadeId, servicoId) => 
+    api.put(`/especialidades/${especialidadeId}/servicos/${servicoId}`),
+  desassociarServico: (especialidadeId, servicoId) => 
+    api.delete(`/especialidades/${especialidadeId}/servicos/${servicoId}`),
+  associarProfissional: (especialidadeId, profissionalId) => 
+    api.put(`/especialidades/${especialidadeId}/profissionais/${profissionalId}`),
+  desassociarProfissional: (especialidadeId, profissionalId) => 
+    api.delete(`/especialidades/${especialidadeId}/profissionais/${profissionalId}`),
 };
 
 export default api;

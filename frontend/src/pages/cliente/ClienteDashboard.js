@@ -21,7 +21,13 @@ const ClienteDashboard = () => {
       
       // Buscar agendamentos futuros
       const agendamentosRes = await clienteAPI.buscarAgendamentos(user.idUsuario, 'futuros');
-      setAgendamentos(agendamentosRes.data.slice(0, 5)); // Apenas os 5 primeiros
+      
+      // CORREÇÃO: Filtrar apenas AGENDADO e ALTERADO (não cancelados)
+      const agendamentosFiltrados = agendamentosRes.data.filter(ag => 
+        ag.status === 'AGENDADO' || ag.status === 'ALTERADO'
+      );
+      
+      setAgendamentos(agendamentosFiltrados.slice(0, 5)); // Apenas os 5 primeiros
 
       // Buscar serviços
       const servicosRes = await servicoAPI.listar();
@@ -164,7 +170,7 @@ const ClienteDashboard = () => {
                             {formatarMoeda(servico.preco)}
                           </span>
                           <span style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>
-                            {servico.duracao_em_minutos} min
+                            {servico.duracao_em_minutos || 0} min
                           </span>
                         </div>
                       </div>
